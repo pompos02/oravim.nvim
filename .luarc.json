@@ -1,0 +1,10 @@
+{
+    "diagnostics.globals": [
+        "vim",
+        "connection_string"
+    ],
+    "diagnostics.disable": [
+        "need-check-nil",
+        "undefined-field"
+    ]
+}
