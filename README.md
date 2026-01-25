@@ -19,7 +19,7 @@ Oracle-only Neovim plugin that runs SQL through `sqlplus`, shows results in a sp
 ### lazy.nvim
 ```lua
 {
-    "karavellas/oravim",
+    "popmpos02/oravim",
     config = function()
         require("oravim").setup({
             -- optional configuration (see below)
@@ -31,7 +31,7 @@ Oracle-only Neovim plugin that runs SQL through `sqlplus`, shows results in a sp
 ### packer.nvim
 ```lua
 use({
-    "karavellas/oravim",
+    "popmpos02/oravim",
     config = function()
         require("oravim").setup({
             -- optional configuration (see below)
