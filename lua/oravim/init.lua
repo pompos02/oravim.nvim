@@ -11,7 +11,7 @@ local data_dir = vim.fn.stdpath("data") .. "/oravim"
 
 -- defaults oravim settings
 local defaults = {
-    cli = "sqlplus",
+    cli = "sql",
     drawer = { width = 40, position = "left" },
     query = {
         filetype = "plsql",
@@ -200,7 +200,9 @@ function M.setup(opts)
 end
 
 function M.connect(arg)
-    M.setup()
+    if not initialized then
+        M.setup()
+    end
     if not arg or vim.trim(arg) == "" then
         notify("Connection string required", vim.log.levels.ERROR)
         return
