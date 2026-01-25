@@ -11,7 +11,7 @@ local data_dir = vim.fn.stdpath("data") .. "/oravim"
 
 -- defaults oravim settings
 local defaults = {
-    cli = "sql",
+    cli = "sqlplus",
     drawer = { width = 40, position = "left" },
     query = {
         filetype = "plsql",
