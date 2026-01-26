@@ -11,6 +11,14 @@ vim.keymap.set("n", "<F8>", function()
     oravim.run()
 end, { desc = "Oravim: run", silent = true })
 
+vim.keymap.set("v", "<space>pp", function()
+    oravim.run({ selection = true, pretty_result = true })
+end, { desc = "Oravim: run selection (pretty)", silent = true })
+
+vim.keymap.set("n", "<space>pp", function()
+    oravim.run({ pretty_result = true })
+end, { desc = "Oravim: run (pretty)", silent = true })
+
 -- Commands
 vim.api.nvim_create_user_command("OraConnect", function(opts)
     oravim.connect(opts.args)

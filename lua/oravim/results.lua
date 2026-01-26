@@ -23,7 +23,7 @@ end
 
 local function build_header(res)
 
-    local status = "¯¯̿̿¯̿̿'̿̿̿̿̿̿̿'̿̿'̿̿̿̿̿'̿̿̿)͇̿̿)̿̿̿̿ '̿̿̿̿̿̿\\̵͇̿̿\\=(•̪̀●́)=o/̵͇̿̿/'̿̿ ̿ ̿̿"
+    local status = ""
     if not res.ok then
         status = "ERROR"
     end
