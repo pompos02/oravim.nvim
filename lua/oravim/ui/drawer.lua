@@ -29,8 +29,128 @@ local function indent(level)
     return string.rep("  ", level)
 end
 
+local icon_sets = {
+    ascii = {
+        toggle = { expanded = "-", collapsed = "+", group = "Text" },
+        icons = {
+            db = { text = "*", group = "Identifier" },
+            new_query = { text = "+", group = "String" },
+            saved_queries = { text = "", group = "PreProc" },
+            saved_query = { text = "", group = "PreProc" },
+            buffers = { text = "", group = "Directory" },
+            buffer = { text = "", group = "Directory" },
+            schema = { text = "", group = "Type" },
+            info = { text = "-", group = "Comment" },
+            error = { text = "!", group = "Error" },
+        },
+        sections = {
+            tables = { text = "", group = "Type" },
+            views = { text = "", group = "Type" },
+            functions = { text = "", group = "Function" },
+            triggers = { text = "", group = "Statement" },
+            packages = { text = "", group = "Keyword" },
+            package_bodies = { text = "", group = "Keyword" },
+            types = { text = "", group = "Type" },
+            type_bodies = { text = "", group = "Type" },
+            queues = { text = "", group = "Special" },
+            queue_tables = { text = "", group = "Special" },
+            indexes = { text = "", group = "Identifier" },
+            constraints = { text = "", group = "Constant" },
+            materialized_views = { text = "", group = "Type" },
+            sequences = { text = "", group = "Number" },
+            db_links = { text = "", group = "String" },
+            tablespaces = { text = "", group = "Directory" },
+            clusters = { text = "", group = "Identifier" },
+            schedules = { text = "", group = "Statement" },
+            jobs = { text = "", group = "Statement" },
+        },
+    },
+    nerd = {
+        toggle = { expanded = "", collapsed = "", group = "Text" },
+        icons = {
+            db = { text = "", group = "Identifier" },
+            new_query = { text = "", group = "String" },
+            saved_queries = { text = "", group = "PreProc" },
+            saved_query = { text = "", group = "PreProc" },
+            buffers = { text = "", group = "Directory" },
+            buffer = { text = "", group = "Directory" },
+            schema = { text = "󰌿", group = "Type" },
+            info = { text = "", group = "Comment" },
+            error = { text = "", group = "DiagnosticError" },
+        },
+        sections = {
+            tables = { text = "󰓫", group = "Type" },
+            views = { text = "", group = "Type" },
+            functions = { text = "󰊕", group = "Function" },
+            triggers = { text = "", group = "Statement" },
+            packages = { text = "", group = "Keyword" },
+            package_bodies = { text = "", group = "Keyword" },
+            types = { text = "󰆧", group = "Type" },
+            type_bodies = { text = "", group = "Type" },
+            queues = { text = "", group = "Special" },
+            queue_tables = { text = "", group = "Special" },
+            indexes = { text = "", group = "Identifier" },
+            constraints = { text = "", group = "Constant" },
+            materialized_views = { text = "", group = "Type" },
+            sequences = { text = "󰎠", group = "Number" },
+            db_links = { text = "", group = "String" },
+            tablespaces = { text = "", group = "Directory" },
+            clusters = { text = "󰜢", group = "Identifier" },
+            schedules = { text = "", group = "Statement" },
+            jobs = { text = "", group = "Statement" },
+        },
+    },
+}
+
+local fallback_icon = { text = "?", group = "Comment" }
+
+local function current_icons()
+    if ctx and ctx.config and ctx.config.use_nerd_fonts then
+        return icon_sets.nerd
+    end
+    return icon_sets.ascii
+end
+
 local function toggle_icon(expanded)
-    return expanded and "v" or ">"
+    local icons = current_icons()
+    local text = expanded and icons.toggle.expanded or icons.toggle.collapsed
+    return { text = text, group = icons.toggle.group }
+end
+
+local function icon_for(kind, section_key)
+    local icons = current_icons()
+    if kind == "section" or kind == "object" then
+        return icons.sections[section_key] or fallback_icon
+    end
+    return icons.icons[kind] or fallback_icon
+end
+
+local function build_line(opts)
+    local label = indent(opts.indent or 0)
+    local highlights = {}
+    local col = #label
+
+    if opts.toggle ~= nil then
+        local toggle = toggle_icon(opts.toggle)
+        label = label .. toggle.text .. " "
+        table.insert(highlights, { group = toggle.group, start = col, finish = col + #toggle.text })
+        col = col + #toggle.text + 1
+    end
+
+    if opts.icon then
+        local icon = icon_for(opts.icon, opts.section)
+        label = label .. icon.text .. " "
+        table.insert(highlights, { group = icon.group, start = col, finish = col + #icon.text })
+        col = col + #icon.text + 1
+    end
+
+    local text_start = col
+    label = label .. (opts.text or "")
+    if opts.text_group then
+        table.insert(highlights, { group = opts.text_group, start = text_start, finish = #label })
+    end
+
+    return label, highlights, text_start
 end
 
 -- append the rendered lined to the sidebar and register the corresponing metadata
@@ -262,54 +382,97 @@ local function load_schemas(db)
 end
 
 local function render_db(lines, db)
-    local active = ctx.state.current == db
-    local prefix = active and "*" or " "
+    local prefix = ""
     local status = db.conn_error ~= "" and " !" or ""
-    local label = string.format("%s %s%s", prefix, db.name, status)
+    local label, highlights = build_line({
+        indent = 0,
+        icon = "db",
+        text = string.format("%s%s%s", prefix, db.name, status),
+        text_group = "Identifier",
+    })
+    if status ~= "" then
+        table.insert(highlights, { group = "DiagnosticError", start = #label - 1, finish = #label })
+    end
     add_entry(lines, label, {
         kind = "db",
         db = db,
-        highlights = { { group = "Identifier", start = 0, finish = #label } },
+        highlights = highlights,
     })
 
-    add_entry(lines, indent(1) .. "+ New query", { kind = "new_query", db = db })
+    local new_query_label, new_query_highlights = build_line({
+        indent = 1,
+        icon = "new_query",
+        text = "New query",
+    })
+    add_entry(lines, new_query_label, { kind = "new_query", db = db, highlights = new_query_highlights })
 
-
-    local saved_queries_label = string.format("%s%s Saved queries (%d)", indent(1), toggle_icon(ctx.state.saved.expanded),
-        #ctx.state.saved.list)
+    local saved_queries_label, saved_queries_highlights = build_line({
+        indent = 1,
+        toggle = ctx.state.saved.expanded,
+        icon = "saved_queries",
+        text = string.format("Saved queries (%d)", #ctx.state.saved.list),
+    })
     local saved_queries_count_start = #saved_queries_label - (string.len(tostring(#ctx.state.saved.list)) + 2)
+    table.insert(saved_queries_highlights, {
+        group = "Number",
+        start = saved_queries_count_start,
+        finish = #saved_queries_label,
+    })
     add_entry(lines, saved_queries_label, {
         kind = "saved_queries",
         db = db,
-        highlights = {
-            { group = "Number", start = saved_queries_count_start, finish = #saved_queries_label },
-        },
+        highlights = saved_queries_highlights,
     })
     if ctx.state.saved.expanded then
         for _, path in ipairs(ctx.state.saved.list) do
-            -- local name = path
             local name = vim.fn.fnamemodify(path, ":t")
-            add_entry(lines, indent(2) .. "- " .. name, { kind = "saved_query", path = path })
+            local saved_label, saved_highlights = build_line({
+                indent = 2,
+                icon = "saved_query",
+                text = name,
+            })
+            add_entry(lines, saved_label, { kind = "saved_query", path = path, highlights = saved_highlights })
         end
     end
 
-    local buffers_label = string.format("%s%s Buffers (%d)", indent(1), toggle_icon(db.buffers.expanded),
-        #db.buffers.list)
+    local buffers_label, buffers_highlights = build_line({
+        indent = 1,
+        toggle = db.buffers.expanded,
+        icon = "buffers",
+        text = string.format("Buffers (%d)", #db.buffers.list),
+    })
     local buffers_count_start = #buffers_label - (string.len(tostring(#db.buffers.list)) + 2)
+    table.insert(buffers_highlights, {
+        group = "Number",
+        start = buffers_count_start,
+        finish = #buffers_label,
+    })
     add_entry(lines, buffers_label, {
         kind = "buffers",
         db = db,
-        highlights = {
-            { group = "Number", start = buffers_count_start, finish = #buffers_label },
-        },
+        highlights = buffers_highlights,
     })
     if db.buffers.expanded then
         for _, path in ipairs(db.buffers.list) do
             local name = vim.fn.fnamemodify(path, ":t")
-            if is_tmp_buffer(db, path) then
-                name = "*".. name
+            local is_tmp = is_tmp_buffer(db, path)
+            if is_tmp then
+                name = "*" .. name
             end
-            add_entry(lines, indent(2) .. "- " .. name, { kind = "buffer", db = db, path = path })
+            local buffer_label, buffer_highlights, text_start = build_line({
+                indent = 2,
+                icon = "buffer",
+                text = name,
+            })
+            if is_tmp then
+                table.insert(buffer_highlights, { group = "Special", start = text_start, finish = text_start + 1 })
+            end
+            add_entry(lines, buffer_label, {
+                kind = "buffer",
+                db = db,
+                path = path,
+                highlights = buffer_highlights,
+            })
         end
     end
 
@@ -317,10 +480,20 @@ local function render_db(lines, db)
         load_schemas(db)
     end
     if db.schemas.loading then
-        add_entry(lines, indent(1) .. "(loading...)", { kind = "info" })
+        local loading_label, loading_highlights = build_line({
+            indent = 1,
+            icon = "info",
+            text = "(loading...)",
+        })
+        add_entry(lines, loading_label, { kind = "info", highlights = loading_highlights })
     end
     if db.schemas.loaded and #db.schemas.list == 0 then
-        add_entry(lines, indent(1) .. "(no schemas)", { kind = "info" })
+        local none_label, none_highlights = build_line({
+            indent = 1,
+            icon = "info",
+            text = "(no schemas)",
+        })
+        add_entry(lines, none_label, { kind = "info", highlights = none_highlights })
     end
     for _, schema_name in ipairs(db.schemas.list) do
         local schema_item = db.schemas.items[schema_name]
@@ -328,49 +501,75 @@ local function render_db(lines, db)
             schema_item = build_schema_item()
             db.schemas.items[schema_name] = schema_item
         end
-        local schema_line = string.format("%s%s %s", indent(1), toggle_icon(schema_item.expanded), schema_name)
-        add_entry(lines, schema_line, { kind = "schema", db = db, schema = schema_name })
+        local schema_line, schema_highlights = build_line({
+            indent = 1,
+            toggle = schema_item.expanded,
+            icon = "schema",
+            text = schema_name,
+        })
+        add_entry(lines, schema_line, {
+            kind = "schema",
+            db = db,
+            schema = schema_name,
+            highlights = schema_highlights,
+        })
         if schema_item.expanded then
             for _, entry in ipairs(section_order) do
                 local section = schema_item.sections[entry.key]
                 if section then
                     local count = section.loaded and #section.list or 0
-                    local section_line = string.format(
-                        "%s%s %s (%d)",
-                        indent(2),
-                        toggle_icon(section.expanded),
-                        entry.label,
-                        count
-                    )
+                    local section_line, section_highlights = build_line({
+                        indent = 2,
+                        toggle = section.expanded,
+                        icon = "section",
+                        section = entry.key,
+                        text = string.format("%s (%d)", entry.label, count),
+                    })
                     local count_start = #section_line - (string.len(tostring(count)) + 2)
+                    table.insert(section_highlights, {
+                        group = "Number",
+                        start = count_start,
+                        finish = #section_line,
+                    })
                     add_entry(lines, section_line, {
                         kind = "section",
                         db = db,
                         schema = schema_name,
                         section = entry.key,
-                        highlights = {
-                            { group = "Number", start = count_start, finish = #section_line },
-                        },
+                        highlights = section_highlights,
                     })
                     if section.expanded then
                         if section.loading then
-                            add_entry(lines, indent(3) .. "(loading...)", { kind = "info" })
+                            local loading_label, loading_highlights = build_line({
+                                indent = 4,
+                                icon = "info",
+                                text = "(loading...)",
+                            })
+                            add_entry(lines, loading_label, { kind = "info", highlights = loading_highlights })
                         elseif section.error then
-                            add_entry(lines, indent(3) .. "(error: " .. section.error .. ")", { kind = "info" })
+                            local error_label, error_highlights = build_line({
+                                indent = 4,
+                                icon = "error",
+                                text = "(error: " .. section.error .. ")",
+                            })
+                            add_entry(lines, error_label, { kind = "info", highlights = error_highlights })
                         else
                             for _, object_name in ipairs(section.list) do
-                                add_entry(
-                                    lines,
-                                    indent(3) .. "- " .. object_name,
-                                    {
-                                        kind = "object",
-                                        db = db,
-                                        schema = schema_name,
-                                        name = object_name,
-                                        object_type = entry.object_type,
-                                        section = entry.key,
-                                    }
-                                )
+                                local object_line, object_highlights = build_line({
+                                    indent = 4,
+                                    icon = "object",
+                                    section = entry.key,
+                                    text = object_name,
+                                })
+                                add_entry(lines, object_line, {
+                                    kind = "object",
+                                    db = db,
+                                    schema = schema_name,
+                                    name = object_name,
+                                    object_type = entry.object_type,
+                                    section = entry.key,
+                                    highlights = object_highlights,
+                                })
                             end
                         end
                     end
