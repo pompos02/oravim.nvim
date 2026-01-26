@@ -383,7 +383,7 @@ function M.execute(opts)
                 duration = duration,
             }
             ctx.results.show(res)
-        end)
+        end, { pretty_result = ctx.config.pretty_result })
     end)
 end
 
