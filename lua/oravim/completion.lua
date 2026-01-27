@@ -459,7 +459,7 @@ function M.collect(opts)
         return {}, false
     end
 
-    local max_items = ctx.config.max_completio_items or 200
+    local max_items = ctx.config.max_completion_items or 200
     local menu = "[Ora]"
 
     if after_dot then
