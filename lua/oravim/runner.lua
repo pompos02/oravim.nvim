@@ -5,8 +5,9 @@ local function build_prelude(pretty_result)
     local lines = {
         -- "SET HEADING OFF",
         "SET FEEDBACK ON",
-        "SET PAGESIZE 4000",
-        "SET LINESIZE 4000",
+        "SET PAGESIZE 50000",
+        "SET LONG 50000",
+        "SET LINESIZE 32767",
         "SET TAB OFF",
         "SET TRIMSPOOL ON",
     }

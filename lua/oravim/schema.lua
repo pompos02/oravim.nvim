@@ -43,8 +43,9 @@ local function wrap_query(sql)
     return table.concat({
         "SET HEADING OFF",
         "SET FEEDBACK OFF",
-        "SET PAGESIZE 4000",
-        "SET LINESIZE 4000",
+        "SET PAGESIZE 50000",
+        "SET LONG 50000",
+        "SET LINESIZE 32767",
         sql,
     }, "\n")
 end
