@@ -457,7 +457,7 @@ local function render_db(lines, db)
             local name = vim.fn.fnamemodify(path, ":t")
             local is_tmp = is_tmp_buffer(db, path)
             if is_tmp then
-                name = "*" .. name
+                name =  name .. "*"
             end
             local buffer_label, buffer_highlights, text_start = build_line({
                 indent = 2,
@@ -465,7 +465,7 @@ local function render_db(lines, db)
                 text = name,
             })
             if is_tmp then
-                table.insert(buffer_highlights, { group = "Special", start = text_start, finish = text_start + 1 })
+                table.insert(buffer_highlights, { group = "Special", start = text_start + #name - 1, finish = text_start + #name })
             end
             add_entry(lines, buffer_label, {
                 kind = "buffer",

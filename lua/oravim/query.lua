@@ -284,7 +284,7 @@ function M.open_new()
             ctx.notify(err or "Unable to connect", vim.log.levels.ERROR)
             return
         end
-        local name = string.format("%s-%s", slug(db.name), os.date("%Y%m%d-%H%M%S"))
+        local name = string.format("%s", os.date("%H%M%S-%d%m%Y"))
         local path = string.format("%s/%s.sql", db.tmp_dir, name)
         local content = build_default_content(db, "", "")
         open_buffer(db, path, { content = content, is_tmp = true })

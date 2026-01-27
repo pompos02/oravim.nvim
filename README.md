@@ -1,17 +1,27 @@
 # oravim
 
-Oracle-only Neovim plugin that runs SQL through `sqlplus`, shows results in a split, and browses the current schema from a lightweight drawer.
+Oracle-only Neovim plugin that runs SQL through `sqlplus`, has a builtin schema aware completion engine, shows results in a split, and browses the current schema from a lightweight drawer.
 
 ## Features
-- Oracle-only workflow powered by `sqlplus`
-- Drawer UI for schema, objects, buffers, and saved queries
+- Drawer UI for schema, objects, buffers e.t.c
+- Omnifunc/blink.cmp completion for tables, views, columns, packages, functions and members 
+- View function/procedure/type specs and bodies from the drawer
 - Run full buffer or visual selection
 - Query templates for new buffers and table-centric queries
 - Saved query files with rename/delete from the drawer
-- Omnifunc/blink.cmp completion for tables, views, columns, packages, and members
+
+## Developer Notes
+You can also use Oravim just for PL/SQL or query development without the UI: connect with `:OraConnect`, close the drawer, and keep the buffer open to use omnifunc or blink.cmp completions.
+
+You may also want the companion blink.cmp source for PL/SQL keyword completion: https://github.com/pompos02/blink-cmp-plsql.nvim
+## UI
+
+![Oravim screenshot](media/screenshot.png)
+
+Video showcasing completions, querying and general workflow: [oravimdemo1.mp4](media/oravimdemo1.mp4)
 
 ## Requirements
-- Neovim 0.10+ (uses `vim.system`)
+- Neovim 0.10+ 
 - Oracle `sqlplus` available on your PATH
 
 ## Installation
@@ -68,15 +78,42 @@ use({
 ## Usage
 
 ### Commands
-- `:OraConnect {sqlplus-connection-string}`
-- `:OraToggle`
-- `:OraSave`
+- `:OraConnect {sqlplus-connection-string}`: connect to Oracle (example: `user/password@host`)
+- `:OraToggle`: open/close the drawer with schema objects and saved queries
+- `:OraSave`: save the current query buffer into your saved queries list
 
 ### Default keymaps
 These are defined by the plugin and can be overridden in your config.
 
-- Normal mode: `<F8>` runs the current buffer
-- Visual mode: `<F8>` runs the selection
+- **Normal mode:** `<F8>` runs the current buffer
+- **Visual mode:** `<F8>` runs the selection
+- **Normal mode:** `<space>pp` runs with pretty output `[EXPERIMENTAL]` ⚠️
+- **Visual mode:** `<space>pp` runs the selection with pretty output `[EXPERIMENTAL]` ⚠️
+
+To override them, delete the defaults and set your own after the plugin loads:
+
+```lua
+vim.keymap.del("n", "<F8>")
+vim.keymap.del("v", "<F8>")
+vim.keymap.del("n", "<space>pp")
+vim.keymap.del("v", "<space>pp")
+
+vim.keymap.set("n", "<leader>or", function()
+    require("oravim").run()
+end, { desc = "Oravim: run" })
+
+vim.keymap.set("v", "<leader>or", function()
+    require("oravim").run({ selection = true })
+end, { desc = "Oravim: run selection" })
+
+vim.keymap.set("n", "<leader>op", function()
+    require("oravim").run({ pretty_result = true })
+end, { desc = "Oravim: run (pretty)" })
+
+vim.keymap.set("v", "<leader>op", function()
+    require("oravim").run({ selection = true, pretty_result = true })
+end, { desc = "Oravim: run selection (pretty)" })
+```
 
 ### Drawer controls
 - `<CR>` / `o`: open or toggle the focused item
@@ -86,35 +123,9 @@ These are defined by the plugin and can be overridden in your config.
 - `<leader>C`: collapse all schema sections
 - `<leader>E`: expand all schema sections
 
-## Configuration
-
-```lua
-require("oravim").setup({
-    cli = "sqlplus",
-    drawer = {
-        width = 40,
-        position = "left", -- "left" or "right"
-    },
-    max_completion_items = 5000,
-    query = {
-        filetype = "plsql",
-        default = "SELECT * FROM {optional_schema}{table};",
-        new_query = "",
-        execute_on_save = false,
-        tmp_dir = "/tmp/oravim",
-        saved_dir = vim.fn.stdpath("data") .. "/oravim/saved_queries",
-    },
-})
-```
-
-### Template placeholders
-- `{table}`
-- `{schema}`
-- `{optional_schema}` (includes a trailing `.` when present)
-- `{dbname}`
-
 ## Completion
 Oravim sets `omnifunc` for the configured `query.filetype`.
+
 
 ### Native omnifunc
 ```lua
@@ -140,6 +151,27 @@ require("blink.cmp").setup({
 })
 ```
 
+## Configuration
+
+```lua
+require("oravim").setup({
+    cli = "sqlplus",
+    drawer = {
+        width = 40,
+        position = "left", -- "left" or "right"
+    },
+    use_nerd_fonts = true,
+    max_completion_items = 5000,
+    query = {
+        filetype = "plsql",
+        default = "SELECT * FROM {optional_schema}{table};",
+        new_query = "",
+        execute_on_save = false,
+        tmp_dir = "/tmp/oravim",
+        saved_dir = vim.fn.stdpath("data") .. "/oravim/saved_queries",
+    },
+})
+```
 ## Data locations
 - Temporary query buffers: `query.tmp_dir` (default: `/tmp/oravim`)
 - Saved queries: `query.saved_dir` (default: `stdpath('data')/oravim/saved_queries`)
@@ -147,7 +179,7 @@ require("blink.cmp").setup({
 ## Behavior notes
 - The plugin extracts the schema owner from the connection string (the username before `/`).
 - Only the current schema owner is shown in the drawer.
-- Results are displayed in a split buffer named `oravim://result`.
+- Pretty output is experimental and may truncate or format differently depending on the query.
 
 ## Troubleshooting
 - `sqlplus not found on PATH`: install Oracle client tools or set `cli` to the full path.
