@@ -12,6 +12,7 @@ local function build_prelude(pretty_result)
     }
     if pretty_result then
         table.insert(lines, "SET MARKUP CSV ON DELIMITER , QUOTE OFF")
+        table.insert(lines, "SET FEEDBACK OFF")
     end
     return table.concat(lines, "\n") .. "\n"
 end
@@ -168,13 +169,30 @@ local function render_table(rows)
     return table.concat(lines, "\n")
 end
 
+local function has_error_prefix(raw)
+    if not raw or raw == "" then
+        return false
+    end
+    local lines = vim.split(raw, "\n", { plain = true })
+    local max_lines = math.min(#lines, 50)
+    for i = 1, max_lines do
+        local line = lines[i]
+        if line:find("ERROR") and line:find("ORA-") then
+            return true
+        end
+    end
+    return false
+end
+
 local function format_pretty_file(path, cb)
     local lines = read_file(path)
     if not lines or #lines == 0 then
         cb(false, "", "")
         return
     end
+
     local raw = table.concat(lines, "\n")
+
     while #lines > 0 and lines[#lines] == "" do
         table.remove(lines)
     end
@@ -217,6 +235,11 @@ local function run_sqlplus(conn, sql, cb, opts)
     if vim.system then
         run_with_vim_system(cmd, payload, function(ok, out, err_out)
             if ok and pretty_result and opts and opts.spool_path then
+                if has_error_prefix(out) then
+                    vim.fn.delete(opts.spool_path)
+                    cb(ok, out, err_out)
+                    return
+                end
                 format_pretty_file(opts.spool_path, function(pretty_ok, pretty_out, _)
                     vim.fn.delete(opts.spool_path)
                     if pretty_ok and pretty_out ~= "" then

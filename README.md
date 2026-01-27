@@ -95,6 +95,7 @@ require("oravim").setup({
         width = 40,
         position = "left", -- "left" or "right"
     },
+    max_completion_items = 5000,
     query = {
         filetype = "plsql",
         default = "SELECT * FROM {optional_schema}{table};",
