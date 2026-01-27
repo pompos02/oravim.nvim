@@ -761,6 +761,18 @@ local function handle_enter()
     end
 end
 
+local function handle_mouse_enter()
+    if not valid_win() then
+        return
+    end
+    local mouse = vim.fn.getmousepos()
+    if not mouse or mouse.winid ~= win or mouse.line <= 0 then
+        return
+    end
+    vim.api.nvim_win_set_cursor(win, { mouse.line, 0 })
+    handle_enter()
+end
+
 local function open_buffer()
     if valid_win() then
         vim.api.nvim_set_current_win(win)
@@ -786,6 +798,7 @@ local function open_buffer()
 
     vim.keymap.set("n", "<CR>", handle_enter, { buffer = buf, silent = true })
     vim.keymap.set("n", "o", handle_enter, { buffer = buf, silent = true })
+    vim.keymap.set("n", "<LeftMouse>", handle_mouse_enter, { buffer = buf, silent = true })
     vim.keymap.set("n", "R", rename_save_query, { buffer = buf })
     vim.keymap.set("n", "q", function()
         require("oravim").toggle_ui()
