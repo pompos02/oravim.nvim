@@ -14,7 +14,7 @@ local defaults = {
     cli = "sqlplus",
     drawer = { width = 40, position = "left" },
     use_nerd_fonts = true,
-    max_completion_items = 200,
+    max_completion_items = 5000,
     query = {
         filetype = "plsql",
         default = "SELECT * FROM {optional_schema}{table};",
