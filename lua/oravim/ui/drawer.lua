@@ -798,7 +798,7 @@ local function open_buffer()
 
     vim.keymap.set("n", "<CR>", handle_enter, { buffer = buf, silent = true })
     vim.keymap.set("n", "o", handle_enter, { buffer = buf, silent = true })
-    vim.keymap.set("n", "<LeftMouse>", handle_mouse_enter, { buffer = buf, silent = true })
+    vim.keymap.set("n", "<2-LeftMouse>", handle_mouse_enter, { buffer = buf, silent = true })
     vim.keymap.set("n", "R", rename_save_query, { buffer = buf })
     vim.keymap.set("n", "q", function()
         require("oravim").toggle_ui()
