@@ -173,8 +173,9 @@ function M.show(res)
     M.stop_loading()
     local header = build_header(res)
     local body = res.ok and res.stdout or (res.stderr ~= "" and res.stderr or res.stdout)
-    local lines = { header, "" }
-    vim.list_extend(lines, split_lines(body))
+    local lines = split_lines(body)
+    lines[#lines + 1] = ""
+    lines[#lines + 1] = header
 
     local buf = ensure_buffer()
     set_lines(buf, lines)
