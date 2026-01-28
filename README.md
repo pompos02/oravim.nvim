@@ -23,6 +23,7 @@ Video showcasing completions, querying and general workflow: [oravimdemo1.mp4](m
 ## Requirements
 - Neovim 0.10+ 
 - Oracle `sqlplus` available on your PATH
+- Oracle `sqlcl` available on your PATH for pretty output (`pretty_result`)
 
 ## Installation
 

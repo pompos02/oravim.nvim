@@ -12,7 +12,7 @@ local function build_prelude(pretty_result)
         "SET TRIMSPOOL ON",
     }
     if pretty_result then
-        table.insert(lines, "SET MARKUP CSV ON DELIMITER , QUOTE OFF")
+        table.insert(lines, "SET SQLFORMAT JSON")
         table.insert(lines, "SET FEEDBACK OFF")
     end
     return table.concat(lines, "\n") .. "\n"
@@ -66,39 +66,92 @@ local function read_file(path)
     return lines
 end
 
-local function parse_csv_line(line)
-    local fields = {}
-    local buf = {}
-    local in_quotes = false
-    local i = 1
-    while i <= #line do
-        local ch = line:sub(i, i)
-        if in_quotes then
-            if ch == '"' then
-                local next_ch = line:sub(i + 1, i + 1)
-                if next_ch == '"' then
-                    buf[#buf + 1] = '"'
-                    i = i + 1
-                else
-                    in_quotes = false
-                end
-            else
-                buf[#buf + 1] = ch
-            end
-        else
-            if ch == '"' then
-                in_quotes = true
-            elseif ch == "," then
-                fields[#fields + 1] = table.concat(buf)
-                buf = {}
-            else
-                buf[#buf + 1] = ch
-            end
-        end
-        i = i + 1
+local function should_strip(type_name)
+    if not type_name or type_name == "" then
+        return false
     end
-    fields[#fields + 1] = table.concat(buf)
-    return fields
+    local type = tostring(type_name)
+    if type == "VARCHAR" or type == "VARCHAR2" or type == "CHAR" then
+        return true
+    end
+    return false
+end
+
+local function normalize_cell(value, col_type)
+    if value == nil or value == vim.NIL then
+        return ""
+    end
+    if type(value) == "table" then
+        local ok, encoded = pcall(vim.fn.json_encode, value)
+        if ok then
+            return encoded
+        end
+        return ""
+    end
+    local str = tostring(value)
+    if should_strip(col_type) then
+        str = str:gsub(" +$", "")
+    end
+    str = str:gsub("\r\n", "\n"):gsub("\r", "\n")
+    str = str:gsub("\n", "\\n")
+    return str
+end
+
+local function get_item_value(item, name)
+    if type(item) ~= "table" then
+        return nil
+    end
+    if item[name] ~= nil then
+        return item[name]
+    end
+    local lower = name:lower()
+    if item[lower] ~= nil then
+        return item[lower]
+    end
+    local upper = name:upper()
+    if item[upper] ~= nil then
+        return item[upper]
+    end
+    for key, value in pairs(item) do
+        if tostring(key):lower() == lower then
+            return value
+        end
+    end
+    return nil
+end
+
+local function build_rows_from_json(decoded)
+    if type(decoded) ~= "table" then
+        return nil
+    end
+    local results = decoded.results
+    if type(results) ~= "table" or #results == 0 then
+        return nil
+    end
+    local result = results[1]
+    local columns = result.columns
+    if type(columns) ~= "table" or #columns == 0 then
+        return nil
+    end
+    local items = result.items
+    local rows = {}
+    local header = {}
+    for i, col in ipairs(columns) do
+        header[i] = col.name
+    end
+    rows[1] = header
+    if type(items) == "table" then
+        for _, item in ipairs(items) do
+            local row = {}
+            for i, col in ipairs(columns) do
+                local name = tostring(col.name or "")
+                local value = get_item_value(item, name)
+                row[i] = normalize_cell(value, col.type)
+            end
+            rows[#rows + 1] = row
+        end
+    end
+    return rows
 end
 
 local function display_width(value)
@@ -194,21 +247,18 @@ local function format_pretty_file(path, cb)
 
     local raw = table.concat(lines, "\n")
 
-    while #lines > 0 and lines[#lines] == "" do
-        table.remove(lines)
-    end
-    if #lines == 0 then
+    local trimmed = vim.trim(raw)
+    if trimmed == "" then
         cb(false, raw, "")
         return
     end
-    local rows = {}
-    for _, line in ipairs(lines) do
-        line = line:gsub("\r$", "")
-        if line ~= "" then
-            rows[#rows + 1] = parse_csv_line(line)
-        end
+    local ok, decoded = pcall(vim.fn.json_decode, trimmed)
+    if not ok then
+        cb(false, raw, "")
+        return
     end
-    if #rows == 0 then
+    local rows = build_rows_from_json(decoded)
+    if not rows or #rows == 0 then
         cb(false, raw, "")
         return
     end
@@ -220,8 +270,16 @@ local function run_sqlplus(conn, sql, cb, opts)
         cb(false, "", "no connection provided")
         return
     end
-    local cmd = { conn.cli, "-S", "-L", conn.conn_string }
     local pretty_result = opts and opts.pretty_result
+    local cmd_bin = conn.cli
+    if pretty_result then
+        cmd_bin = conn.sqlcl or conn.cli
+        if not cmd_bin or vim.fn.executable(cmd_bin) ~= 1 then
+            cb(false, "", string.format("%s not found on PATH", cmd_bin or "sql"))
+            return
+        end
+    end
+    local cmd = { cmd_bin, "-S", "-L", conn.conn_string }
     if pretty_result then
         local results_dir = "/tmp/oravim/results"
         if vim.fn.isdirectory(results_dir) == 0 then
@@ -229,7 +287,7 @@ local function run_sqlplus(conn, sql, cb, opts)
         end
         local tmp_name = vim.fn.fnamemodify(vim.fn.tempname(), ":t")
         opts = opts or {}
-        opts.spool_path = string.format("%s/%s.csv", results_dir, tmp_name)
+        opts.spool_path = string.format("%s/%s.json", results_dir, tmp_name)
     end
     local payload = to_payload(sql, opts)
 

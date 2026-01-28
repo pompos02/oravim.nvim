@@ -12,6 +12,7 @@ local data_dir = vim.fn.stdpath("data") .. "/oravim"
 -- defaults oravim settings
 local defaults = {
     cli = "sqlplus",
+    sqlcl = "sql",
     drawer = { width = 40, position = "left" },
     use_nerd_fonts = true,
     max_completion_items = 5000,
@@ -131,6 +132,7 @@ local function set_current(def, cb)
         url = trimmed,
         conn_string = trimmed,
         cli = bin,
+        sqlcl = config.sqlcl,
         name = db.name,
     }
 
