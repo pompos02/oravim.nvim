@@ -1,3 +1,5 @@
+---Neovim plugin entry for keymaps and commands.
+---@module oravim.plugin
 local oravim = require("oravim")
 local query = require("oravim.query")
 

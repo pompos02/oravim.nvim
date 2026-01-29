@@ -1,22 +1,37 @@
+---Drawer UI for browsing schemas and buffers.
+---@class oravim.ui.drawer
 local M = {}
 
+---@type table|nil
 local ctx = nil
-local buf, win
+---@type integer|nil
+local buf
+---@type integer|nil
+local win
+---@type table[]
 local items = {}
+---@type integer
 local ns = vim.api.nvim_create_namespace("oravim_drawer")
 
+---Set module context shared with other modules.
+---@param new_ctx table
 local function set_ctx(new_ctx)
     ctx = new_ctx
 end
 
+---Check if the drawer window is valid.
+---@return boolean
 local function valid_win()
     return win and vim.api.nvim_win_is_valid(win)
 end
 
+---Check if the drawer buffer is valid.
+---@return boolean
 local function valid_buf()
     return buf and vim.api.nvim_buf_is_valid(buf)
 end
 
+---Close the drawer window and reset handles.
 local function close()
     if valid_win() then
         vim.api.nvim_win_close(win, true)
@@ -25,6 +40,9 @@ local function close()
     buf = nil
 end
 
+---Build indentation whitespace.
+---@param level integer
+---@return string
 local function indent(level)
     return string.rep("  ", level)
 end
@@ -104,6 +122,8 @@ local icon_sets = {
 
 local fallback_icon = { text = "?", group = "Comment" }
 
+---Get the active icon set based on configuration.
+---@return table
 local function current_icons()
     if ctx and ctx.config and ctx.config.use_nerd_fonts then
         return icon_sets.nerd
@@ -111,12 +131,19 @@ local function current_icons()
     return icon_sets.ascii
 end
 
+---Return the toggle icon metadata for a section.
+---@param expanded boolean
+---@return { text: string, group: string }
 local function toggle_icon(expanded)
     local icons = current_icons()
     local text = expanded and icons.toggle.expanded or icons.toggle.collapsed
     return { text = text, group = icons.toggle.group }
 end
 
+---Resolve an icon for a given kind and section key.
+---@param kind string
+---@param section_key? string
+---@return { text: string, group: string }
 local function icon_for(kind, section_key)
     local icons = current_icons()
     if kind == "section" or kind == "object" then
@@ -125,6 +152,11 @@ local function icon_for(kind, section_key)
     return icons.icons[kind] or fallback_icon
 end
 
+---Build a drawer line with highlights metadata.
+---@param opts table
+---@return string
+---@return table[]
+---@return integer
 local function build_line(opts)
     local label = indent(opts.indent or 0)
     local highlights = {}
@@ -154,11 +186,16 @@ local function build_line(opts)
 end
 
 -- append the rendered lined to the sidebar and register the corresponing metadata
+---Append an entry and its metadata.
+---@param lines string[]
+---@param label string
+---@param item? table
 local function add_entry(lines, label, item)
     table.insert(lines, label)
     table.insert(items, item or { kind = "none" })
 end
 
+---Apply highlight extmarks for the current items.
 local function apply_highlights()
     if not valid_buf() then
         return
@@ -176,6 +213,10 @@ local function apply_highlights()
     end
 end
 
+---Check whether a buffer path is temporary for the database.
+---@param db table
+---@param path string
+---@return boolean
 local function is_tmp_buffer(db, path)
     if vim.tbl_contains(db.buffers.tmp, path) then
         return true
@@ -183,6 +224,9 @@ local function is_tmp_buffer(db, path)
     return db.tmp_dir ~= "" and path:find(db.tmp_dir, 1, true) == 1
 end
 
+---Ensure the database connection is available.
+---@param db table
+---@param cb fun(ok: boolean)
 local function ensure_connection(db, cb)
     if db.conn then
         cb(true)
@@ -198,6 +242,8 @@ local function ensure_connection(db, cb)
     end)
 end
 
+---Build the section state table for a schema.
+---@return table
 local function build_sections()
     return {
         tables = { expanded = false, list = {}, loaded = false, loading = false, error = nil },
@@ -222,6 +268,8 @@ local function build_sections()
     }
 end
 
+---Create a schema item with section state.
+---@return table
 local function build_schema_item()
     return {
         expanded = false,
@@ -267,6 +315,10 @@ local source_object_types = {
     ["TYPE BODY"] = true,
 }
 
+---Load a section list for a schema on demand.
+---@param db table
+---@param schema_name string
+---@param section_key string
 local function load_section(db, schema_name, section_key)
     local schema_item = db.schemas.items[schema_name]
     if not schema_item or not schema_item.sections then
@@ -341,6 +393,9 @@ local function load_section(db, schema_name, section_key)
     end)
 end
 
+---Prefetch all sections for a schema.
+---@param db table
+---@param schema_name string
 local function prefetch_schema(db, schema_name)
     local schema_item = db.schemas.items[schema_name]
     if not schema_item then
@@ -351,6 +406,8 @@ local function prefetch_schema(db, schema_name)
     end
 end
 
+---Load schema list for the current database.
+---@param db table
 local function load_schemas(db)
     if db.schemas.loading or db.schemas.loaded then
         return
@@ -381,6 +438,9 @@ local function load_schemas(db)
     end)
 end
 
+---Render the database entry and its children.
+---@param lines string[]
+---@param db table
 local function render_db(lines, db)
     local prefix = ""
     local status = db.conn_error ~= "" and " !" or ""
@@ -579,6 +639,7 @@ local function render_db(lines, db)
     end
 end
 
+---Render the drawer buffer content.
 function M.render()
     if not valid_buf() then
         return
@@ -597,6 +658,7 @@ function M.render()
     apply_highlights()
 end
 
+---Collapse all schema sections.
 function M.collapse_all()
     local db = ctx.state.current
     if not db then
@@ -626,6 +688,7 @@ function M.collapse_all()
     M.render()
 end
 
+---Expand all schema sections.
 function M.expand_all()
     local db = ctx.state.current
     if not db then
@@ -655,6 +718,9 @@ function M.expand_all()
     M.render()
 end
 
+---Toggle the expanded state of a top-level section.
+---@param db table|nil
+---@param section string
 local function toggle_section(db, section)
     if section == "buffers" then
         db.buffers.expanded = not db.buffers.expanded
@@ -669,6 +735,8 @@ local function toggle_section(db, section)
 end
 
 
+---Delete or close the selected item.
+---@param item table
 local function delete_item(item)
     if item.kind == "buffer" then
         local choice = vim.fn.confirm("Close query buffer?", "&Yes\n&No")
@@ -698,6 +766,7 @@ local function delete_item(item)
     end
 end
 
+---Rename a saved query file.
 local function rename_save_query()
     local line = vim.api.nvim_win_get_cursor(win)[1]
     local item = items[line]
@@ -713,6 +782,7 @@ local function rename_save_query()
     M.render()
 end
 
+---Handle activation of the current item.
 local function handle_enter()
     local line = vim.api.nvim_win_get_cursor(win)[1]
     local item = items[line]
@@ -761,6 +831,7 @@ local function handle_enter()
     end
 end
 
+---Handle mouse activation on a drawer item.
 local function handle_mouse_enter()
     if not valid_win() then
         return
@@ -773,6 +844,7 @@ local function handle_mouse_enter()
     handle_enter()
 end
 
+---Open the drawer buffer and set keymaps.
 local function open_buffer()
     if valid_win() then
         vim.api.nvim_set_current_win(win)
@@ -819,15 +891,19 @@ local function open_buffer()
     end, { buffer = buf, silent = true })
 end
 
+---Initialize the drawer with shared context.
+---@param options table
 function M.setup(options)
     set_ctx(options)
 end
 
+---Open the drawer and render content.
 function M.open()
     open_buffer()
     M.render()
 end
 
+---Toggle the drawer window.
 function M.toggle()
     if valid_win() then
         close()

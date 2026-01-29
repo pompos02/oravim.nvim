@@ -1,6 +1,11 @@
+---SQL execution helpers.
+---@class oravim.runner
 local M = {}
 
 -- prelude for the query so it doesn't look off
+---Build the SQL*Plus prelude for consistent formatting.
+---@param pretty_result boolean
+---@return string
 local function build_prelude(pretty_result)
     local lines = {
         -- "SET HEADING OFF",
@@ -18,6 +23,9 @@ local function build_prelude(pretty_result)
     return table.concat(lines, "\n") .. "\n"
 end
 
+---Ensure SQL ends with a statement terminator.
+---@param sql string
+---@return string
 local function ensure_semicolon(sql)
     local trimmed = vim.trim(sql)
     if trimmed == "" then
@@ -32,6 +40,10 @@ local function ensure_semicolon(sql)
     return sql .. "\n"
 end
 
+---Build a SQL*Plus payload for stdin.
+---@param sql string
+---@param opts? { pretty_result?: boolean, spool_path?: string }
+---@return string
 local function to_payload(sql, opts)
     local pretty_result = opts and opts.pretty_result or false
     local payload = build_prelude(pretty_result)
@@ -50,6 +62,10 @@ end
 -- 3 values success_code, stdoot and stderr
 -- we use vim.schedule in vim.system(async) to essentially defer the callback to a safe time where it can touch buffer and windows
 -- Nnvim 0.10?+ api
+---Execute sqlplus using vim.system and return async results.
+---@param cmd string[]
+---@param input string
+---@param cb fun(ok: boolean, stdout: string, stderr: string)
 local function run_with_vim_system(cmd, input, cb)
     vim.system(cmd, { stdin = input, text = true }, function(obj)
         vim.schedule(function()
@@ -58,6 +74,9 @@ local function run_with_vim_system(cmd, input, cb)
     end)
 end
 
+---Read a file into a list of lines.
+---@param path string
+---@return string[]|nil
 local function read_file(path)
     local ok, lines = pcall(vim.fn.readfile, path)
     if not ok then
@@ -66,6 +85,9 @@ local function read_file(path)
     return lines
 end
 
+---Check if a column type should have trailing spaces trimmed.
+---@param type_name? string
+---@return boolean
 local function should_strip(type_name)
     if not type_name or type_name == "" then
         return false
@@ -77,6 +99,10 @@ local function should_strip(type_name)
     return false
 end
 
+---Normalize a cell value for pretty table output.
+---@param value any
+---@param col_type? string
+---@return string
 local function normalize_cell(value, col_type)
     if value == nil or value == vim.NIL then
         return ""
@@ -97,6 +123,10 @@ local function normalize_cell(value, col_type)
     return str
 end
 
+---Get a column value by case-insensitive key lookup.
+---@param item table
+---@param name string
+---@return any
 local function get_item_value(item, name)
     if type(item) ~= "table" then
         return nil
@@ -120,6 +150,9 @@ local function get_item_value(item, name)
     return nil
 end
 
+---Convert SQLcl JSON results into table rows.
+---@param decoded table
+---@return string[][]|nil
 local function build_rows_from_json(decoded)
     if type(decoded) ~= "table" then
         return nil
@@ -154,10 +187,17 @@ local function build_rows_from_json(decoded)
     return rows
 end
 
+---Get display width of a string.
+---@param value string
+---@return integer
 local function display_width(value)
     return vim.fn.strdisplaywidth(value)
 end
 
+---Pad a string to the given display width.
+---@param value string
+---@param width integer
+---@return string
 local function pad(value, width)
     local current = display_width(value)
     if current < width then
@@ -166,6 +206,9 @@ local function pad(value, width)
     return value
 end
 
+---Render a table with box drawing characters.
+---@param rows string[][]
+---@return string
 local function render_table(rows)
     if #rows == 0 then
         return ""
@@ -223,6 +266,9 @@ local function render_table(rows)
     return table.concat(lines, "\n")
 end
 
+---Detect common error prefixes in SQL*Plus output.
+---@param raw string
+---@return boolean
 local function has_error_prefix(raw)
     if not raw or raw == "" then
         return false
@@ -238,6 +284,9 @@ local function has_error_prefix(raw)
     return false
 end
 
+---Format a SQLcl JSON spool file into a text table.
+---@param path string
+---@param cb fun(ok: boolean, out: string, err: string)
 local function format_pretty_file(path, cb)
     local lines = read_file(path)
     if not lines or #lines == 0 then
@@ -265,6 +314,11 @@ local function format_pretty_file(path, cb)
     cb(true, render_table(rows), "")
 end
 
+---Execute SQL via sqlplus/sqlcl and return stdout/stderr.
+---@param conn { cli: string, sqlcl?: string, conn_string: string }
+---@param sql string
+---@param cb fun(ok: boolean, out: string, err: string)
+---@param opts? { pretty_result?: boolean, spool_path?: string }
 local function run_sqlplus(conn, sql, cb, opts)
     if not conn then
         cb(false, "", "no connection provided")
@@ -316,10 +370,18 @@ local function run_sqlplus(conn, sql, cb, opts)
     end
 end
 
+---Run SQL using the configured CLI.
+---@param conn table
+---@param sql string
+---@param cb fun(ok: boolean, out: string, err: string)
+---@param opts? table
 function M.run(conn, sql, cb, opts)
     run_sqlplus(conn, sql, cb, opts)
 end
 
+---Ping the connection with a simple query.
+---@param conn table
+---@param cb fun(ok: boolean, out: string, err: string)
 function M.ping(conn, cb)
     run_sqlplus(conn, "SELECT 1 FROM dual", cb, { pretty_result = false })
 end

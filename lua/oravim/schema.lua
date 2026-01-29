@@ -1,7 +1,12 @@
+---Schema metadata queries.
+---@class oravim.schema
 local runner = require("oravim.runner")
 
 local M = {}
 
+---Parse newline-delimited output into a list.
+---@param out string
+---@return string[]
 local function parse_lines(out)
     local items = {}
     for line in string.gmatch(out or "", "[^\r\n]+") do
@@ -13,6 +18,9 @@ local function parse_lines(out)
     return items
 end
 
+---Parse source output lines, trimming the first blank line.
+---@param out string
+---@return string[]
 local function parse_source_lines(out)
     if not out or out == "" then
         return {}
@@ -31,14 +39,23 @@ local function parse_source_lines(out)
     return items
 end
 
+---Escape a value for SQL single-quoted strings.
+---@param value? string
+---@return string
 local function escape_sql(value)
     return (value or ""):gsub("'", "''")
 end
 
+---Wrap a value in single quotes for SQL.
+---@param value? string
+---@return string
 local function quote(value)
     return "'" .. escape_sql(value) .. "'"
 end
 
+---Wrap a SQL fragment with SQL*Plus formatting options.
+---@param sql string
+---@return string
 local function wrap_query(sql)
     return table.concat({
         "SET HEADING OFF",
@@ -236,6 +253,9 @@ local queries = {
     end,
 }
 
+---List available schemas.
+---@param conn table
+---@param cb fun(list?: string[]|nil, err?: string)
 function M.list_schemas(conn, cb)
     runner.run(conn, queries.schemas(), function(ok, out, err)
         if not ok then
@@ -246,6 +266,10 @@ function M.list_schemas(conn, cb)
     end)
 end
 
+---List tables for a schema.
+---@param conn table
+---@param schema_name string
+---@param cb fun(list?: string[]|nil, err?: string)
 function M.list_tables(conn, schema_name, cb)
     local sql = queries.tables(schema_name)
     if not sql then
@@ -261,6 +285,10 @@ function M.list_tables(conn, schema_name, cb)
     end)
 end
 
+---List views for a schema.
+---@param conn table
+---@param schema_name string
+---@param cb fun(list?: string[]|nil, err?: string)
 function M.list_views(conn, schema_name, cb)
     local sql = queries.views(schema_name)
     if not sql then
@@ -276,6 +304,10 @@ function M.list_views(conn, schema_name, cb)
     end)
 end
 
+---List packages for a schema.
+---@param conn table
+---@param schema_name string
+---@param cb fun(list?: string[]|nil, err?: string)
 function M.list_packages(conn, schema_name, cb)
     local sql = queries.packages(schema_name)
     if not sql then
@@ -291,6 +323,11 @@ function M.list_packages(conn, schema_name, cb)
     end)
 end
 
+---List objects of a given type for a schema.
+---@param conn table
+---@param schema_name string
+---@param object_type string
+---@param cb fun(list?: string[]|nil, err?: string)
 function M.list_objects(conn, schema_name, object_type, cb)
     local sql = queries.objects(schema_name, object_type)
     if not sql then
@@ -306,6 +343,12 @@ function M.list_objects(conn, schema_name, object_type, cb)
     end)
 end
 
+---Fetch source lines for a database object.
+---@param conn table
+---@param schema_name string
+---@param object_name string
+---@param object_type string
+---@param cb fun(lines?: string[]|nil, err?: string)
 function M.get_source(conn, schema_name, object_name, object_type, cb)
     local sql = queries.source(schema_name, object_name, object_type)
     if not sql then
@@ -321,6 +364,11 @@ function M.get_source(conn, schema_name, object_name, object_type, cb)
     end)
 end
 
+---List columns for a table.
+---@param conn table
+---@param schema_name string
+---@param table_name string
+---@param cb fun(list?: string[]|nil, err?: string)
 function M.list_columns(conn, schema_name, table_name, cb)
     local sql = queries.columns(schema_name, table_name)
     if not sql then
@@ -336,6 +384,11 @@ function M.list_columns(conn, schema_name, table_name, cb)
     end)
 end
 
+---List members for a package.
+---@param conn table
+---@param schema_name string
+---@param package_name string
+---@param cb fun(list?: string[]|nil, err?: string)
 function M.list_package_members(conn, schema_name, package_name, cb)
     local sql = queries.package_members(schema_name, package_name)
     if not sql then
@@ -351,6 +404,10 @@ function M.list_package_members(conn, schema_name, package_name, cb)
     end)
 end
 
+---List queues for a schema.
+---@param conn table
+---@param schema_name string
+---@param cb fun(list?: string[]|nil, err?: string)
 function M.list_queues(conn, schema_name, cb)
     local sql = queries.queues(schema_name)
     if not sql then
@@ -366,6 +423,10 @@ function M.list_queues(conn, schema_name, cb)
     end)
 end
 
+---List queue tables for a schema.
+---@param conn table
+---@param schema_name string
+---@param cb fun(list?: string[]|nil, err?: string)
 function M.list_queue_tables(conn, schema_name, cb)
     local sql = queries.queue_tables(schema_name)
     if not sql then
@@ -381,6 +442,10 @@ function M.list_queue_tables(conn, schema_name, cb)
     end)
 end
 
+---List indexes for a schema.
+---@param conn table
+---@param schema_name string
+---@param cb fun(list?: string[]|nil, err?: string)
 function M.list_indexes(conn, schema_name, cb)
     local sql = queries.indexes(schema_name)
     if not sql then
@@ -396,6 +461,10 @@ function M.list_indexes(conn, schema_name, cb)
     end)
 end
 
+---List constraints for a schema.
+---@param conn table
+---@param schema_name string
+---@param cb fun(list?: string[]|nil, err?: string)
 function M.list_constraints(conn, schema_name, cb)
     local sql = queries.constraints(schema_name)
     if not sql then
@@ -411,6 +480,10 @@ function M.list_constraints(conn, schema_name, cb)
     end)
 end
 
+---List materialized views for a schema.
+---@param conn table
+---@param schema_name string
+---@param cb fun(list?: string[]|nil, err?: string)
 function M.list_materialized_views(conn, schema_name, cb)
     local sql = queries.materialized_views(schema_name)
     if not sql then
@@ -426,6 +499,10 @@ function M.list_materialized_views(conn, schema_name, cb)
     end)
 end
 
+---List sequences for a schema.
+---@param conn table
+---@param schema_name string
+---@param cb fun(list?: string[]|nil, err?: string)
 function M.list_sequences(conn, schema_name, cb)
     local sql = queries.sequences(schema_name)
     if not sql then
@@ -441,6 +518,10 @@ function M.list_sequences(conn, schema_name, cb)
     end)
 end
 
+---List database links for a schema.
+---@param conn table
+---@param schema_name string
+---@param cb fun(list?: string[]|nil, err?: string)
 function M.list_db_links(conn, schema_name, cb)
     local sql = queries.db_links(schema_name)
     if not sql then
@@ -456,6 +537,10 @@ function M.list_db_links(conn, schema_name, cb)
     end)
 end
 
+---List tablespaces for the current user.
+---@param conn table
+---@param _ any
+---@param cb fun(list?: string[]|nil, err?: string)
 function M.list_tablespaces(conn, _, cb)
     local sql = queries.tablespaces()
     if not sql then
@@ -471,6 +556,10 @@ function M.list_tablespaces(conn, _, cb)
     end)
 end
 
+---List clusters for a schema.
+---@param conn table
+---@param schema_name string
+---@param cb fun(list?: string[]|nil, err?: string)
 function M.list_clusters(conn, schema_name, cb)
     local sql = queries.clusters(schema_name)
     if not sql then
@@ -486,6 +575,10 @@ function M.list_clusters(conn, schema_name, cb)
     end)
 end
 
+---List scheduler schedules for a schema.
+---@param conn table
+---@param schema_name string
+---@param cb fun(list?: string[]|nil, err?: string)
 function M.list_schedules(conn, schema_name, cb)
     local sql = queries.schedules(schema_name)
     if not sql then
@@ -501,6 +594,10 @@ function M.list_schedules(conn, schema_name, cb)
     end)
 end
 
+---List scheduler jobs for a schema.
+---@param conn table
+---@param schema_name string
+---@param cb fun(list?: string[]|nil, err?: string)
 function M.list_jobs(conn, schema_name, cb)
     local sql = queries.jobs(schema_name)
     if not sql then

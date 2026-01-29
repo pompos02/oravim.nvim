@@ -1,8 +1,15 @@
+---Blink.cmp completion source.
+---@class oravim.blink
+---@diagnostic disable-next-line: assign-type-mismatch
 local completion = require("oravim.completion")
 
 local source = {}
+---@type table|nil
 local kind_map = nil
 
+---Map Oravim kinds to LSP kinds.
+---@param kind string
+---@return integer|nil
 local function get_kind(kind)
     if not kind_map then
         local ok, types = pcall(require, "blink.cmp.types")
@@ -25,6 +32,9 @@ local function get_kind(kind)
     return kind_map[kind] or kind_map._
 end
 
+---Convert Vim-style completion items to LSP items.
+---@param items table[]|nil
+---@return table[]
 local function to_lsp_items(items)
     local out = {}
     for _, item in ipairs(items or {}) do
@@ -41,6 +51,10 @@ local function to_lsp_items(items)
     return out
 end
 
+---Collect completion items
+---@param opts table
+---@return table[]
+---@return boolean
 local function safe_collect(opts)
     local ok, items, pending = pcall(completion.collect, opts)
     if not ok then
@@ -49,6 +63,10 @@ local function safe_collect(opts)
     return items, pending
 end
 
+---Create a new completion source instance.
+---@param opts? table
+---@param config? table
+---@return table
 function source.new(opts, config)
     local self = setmetatable({}, { __index = source })
     self.opts = opts or {}
@@ -56,6 +74,8 @@ function source.new(opts, config)
     return self
 end
 
+---Check whether the source is enabled for the current buffer.
+---@return boolean
 function source:enabled()
     if type(self.opts.enable_in_context) == "function" then
         if not self.opts.enable_in_context() then
@@ -68,10 +88,16 @@ function source:enabled()
     return vim.bo.filetype == completion.get_filetype()
 end
 
+---Return trigger characters for completion.
+---@return string[]
 function source:get_trigger_characters()
     return { "." }
 end
 
+---Provide completion items for blink.cmp.
+---@param ctx table
+---@param callback fun(result: table)
+---@return fun()
 function source:get_completions(ctx, callback)
     local cancelled = false
     local bufnr = ctx.bufnr or vim.api.nvim_get_current_buf()

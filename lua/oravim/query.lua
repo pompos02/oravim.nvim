@@ -1,13 +1,26 @@
+---Query buffer management and execution.
+---@class oravim.query
 local runner = require("oravim.runner")
 local schema = require("oravim.schema")
 
 local M = {}
+---@type table|nil
 local ctx = nil
 
+---Set module context shared with other modules.
+---@param options table
 local function set_ctx(options)
     ctx = options
 end
 
+---Ensure the user is in normal mode
+local function ensure_normal_mode()
+    if vim.fn.mode() ~= "n" then
+        vim.cmd("normal! <Esc>")
+    end
+end
+
+---Ensure the module has been initialized.
 local function ensure_ctx()
     if not ctx then
         error("oravim.query not initialized")
@@ -15,6 +28,9 @@ local function ensure_ctx()
 end
 
 -- Normilise string so it's safe for filenames
+---Normalize a string to a filesystem-safe slug.
+---@param value? string
+---@return string
 local function slug(value)
     local name = (value or ""):lower()
     name = name:gsub("%s+", "-")
@@ -23,10 +39,15 @@ local function slug(value)
     return name ~= "" and name or "oravim"
 end
 
+---Uppercase and slugify a value.
+---@param value? string
+---@return string
 local function slug_upper(value)
     return slug((value or ""):upper())
 end
 
+---Ensure a directory exists.
+---@param path string
 local function ensure_dir(path)
     if path == "" then
         return
@@ -36,6 +57,9 @@ local function ensure_dir(path)
     end
 end
 
+---Get the visual selection text from a buffer.
+---@param buf integer
+---@return string|nil
 local function get_visual_selection(buf)
     local mode = vim.fn.mode()
     local start_pos, end_pos
@@ -75,6 +99,10 @@ local function get_visual_selection(buf)
     return table.concat(lines, "\n")
 end
 
+---Extract SQL from a buffer or visual selection.
+---@param opts { buf?: integer, selection?: boolean }
+---@return string|nil
+---@return string|nil
 function M.extract(opts)
     local buf = opts.buf or vim.api.nvim_get_current_buf()
     local sql
@@ -89,6 +117,9 @@ function M.extract(opts)
     return sql
 end
 
+---Ensure a database entry has an active connection.
+---@param db table
+---@param cb fun(conn: table|nil, err?: string)
 local function ensure_connection(db, cb)
     if db.conn then
         cb(db.conn)
@@ -103,6 +134,8 @@ local function ensure_connection(db, cb)
     end)
 end
 
+---Ensure there is a current connection selected.
+---@param cb fun(conn: table|nil, err?: string)
 local function ensure_current(cb)
     local db = ctx.state.current
     if not db then
@@ -112,6 +145,10 @@ local function ensure_current(cb)
     ensure_connection(db, cb)
 end
 
+---Check whether a query buffer path is temporary.
+---@param db table
+---@param path string
+---@return boolean
 local function is_tmp_buffer(db, path)
     if vim.tbl_contains(db.buffers.tmp, path) then
         return true
@@ -119,6 +156,10 @@ local function is_tmp_buffer(db, path)
     return db.tmp_dir ~= "" and path:find(db.tmp_dir, 1, true) == 1
 end
 
+---Register a buffer in the database state.
+---@param db table
+---@param path string
+---@param tmp boolean
 local function add_buffer(db, path, tmp)
     if not vim.tbl_contains(db.buffers.list, path) then
         table.insert(db.buffers.list, path)
@@ -132,6 +173,9 @@ local function add_buffer(db, path, tmp)
     end
 end
 
+---Remove a buffer from the database state.
+---@param db table
+---@param path string
 local function remove_buffer(db, path)
     for i = #db.buffers.list, 1, -1 do
         if db.buffers.list[i] == path then
@@ -146,6 +190,7 @@ local function remove_buffer(db, path)
 end
 
 -- open query buffer in a non-drawer window
+---Focus a non-drawer window for query buffers.
 local function focus_query_window()
     if vim.bo.filetype ~= "oravimui" then
         return
@@ -162,6 +207,9 @@ local function focus_query_window()
 end
 
 -- replace the buffer content with the provided string
+---Replace a buffer's content with string or lines.
+---@param buf integer
+---@param content string|string[]|nil
 local function set_buffer_content(buf, content)
     if not content then
         return
@@ -175,6 +223,11 @@ local function set_buffer_content(buf, content)
 end
 
 -- boostrap function for any opened query buffer
+---Initialize a query buffer with metadata and keymaps.
+---@param db table
+---@param buf integer
+---@param path string
+---@param opts table
 local function setup_buffer(db, buf, path, opts)
     local schema = opts.schema or ""
     local table_name = opts.table or ""
@@ -218,6 +271,11 @@ local function setup_buffer(db, buf, path, opts)
     end
 end
 
+---Build default SQL content for a new query buffer.
+---@param db table
+---@param schema_name string
+---@param table_name string
+---@return string
 local function build_default_content(db, schema_name, table_name)
     if not table_name or table_name == "" then
         local base = ctx.config.query.new_query or ""
@@ -236,6 +294,12 @@ local function build_default_content(db, schema_name, table_name)
     return template
 end
 
+---Build a temp path for source preview buffers.
+---@param db table
+---@param schema_name string
+---@param object_name string
+---@param object_type string
+---@return string
 local function build_source_path(db, schema_name, object_name, object_type)
     local safe_schema = slug_upper(schema_name)
     local safe_object = slug_upper(object_name)
@@ -243,6 +307,11 @@ local function build_source_path(db, schema_name, object_name, object_type)
     return string.format("%s/%s-%s-%s.sql", db.tmp_dir, safe_schema, safe_object, safe_type)
 end
 
+---Open or focus a query buffer at the given path.
+---@param db table
+---@param path string
+---@param opts table
+---@return integer
 local function open_buffer(db, path, opts)
     focus_query_window()
     ensure_dir(vim.fn.fnamemodify(path, ":p:h"))
@@ -268,10 +337,13 @@ local function open_buffer(db, path, opts)
     return bufnr
 end
 
+---Initialize the query module with context.
+---@param options table
 function M.setup(options)
     set_ctx(options)
 end
 
+---Open a new temporary query buffer.
 function M.open_new()
     ensure_ctx()
     local db = ctx.state.current
@@ -291,6 +363,9 @@ function M.open_new()
     end)
 end
 
+---Open a query buffer prefilled for a table.
+---@param schema_name string
+---@param table_name string
 function M.open_table(schema_name, table_name)
     ensure_ctx()
     local db = ctx.state.current
@@ -311,6 +386,10 @@ function M.open_table(schema_name, table_name)
     end)
 end
 
+---Open a read-only source buffer for a database object.
+---@param schema_name string
+---@param object_name string
+---@param object_type string
 function M.open_source(schema_name, object_name, object_type)
     ensure_ctx()
     local db = ctx.state.current
@@ -334,6 +413,8 @@ function M.open_source(schema_name, object_name, object_type)
     end)
 end
 
+---Open an existing query file in the current connection.
+---@param path string
 function M.open_buffer(path)
     ensure_ctx()
     local db = ctx.state.current
@@ -344,6 +425,9 @@ function M.open_buffer(path)
     open_buffer(db, path, { content = nil, is_tmp = is_tmp_buffer(db, path) })
 end
 
+---Close and unregister a query buffer.
+---@param db table
+---@param path string
 function M.delete_buffer(db, path)
     ensure_ctx()
     local bufnr = vim.fn.bufnr(path)
@@ -356,6 +440,8 @@ function M.delete_buffer(db, path)
     end
 end
 
+---Execute SQL from a buffer or selection.
+---@param opts { buf?: integer, selection?: boolean, pretty_result?: boolean }
 function M.execute(opts)
     ensure_ctx()
     local buf = opts.buf or vim.api.nvim_get_current_buf()
@@ -372,6 +458,7 @@ function M.execute(opts)
         end
 
         ctx.results.loading("Executing query...")
+        ensure_normal_mode()
         local start = vim.uv.hrtime()
         runner.run(conn, sql, function(ok, out, err_out)
             local duration = (vim.uv.hrtime() - start) / 1e9
@@ -387,6 +474,7 @@ function M.execute(opts)
     end)
 end
 
+---Save the current buffer to the saved queries directory.
 function M.save_query()
     ensure_ctx()
     local path = vim.fn.input("Save as: ", ctx.config.query.saved_dir .. "/", "file")

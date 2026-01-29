@@ -1,3 +1,5 @@
+---Main Oravim module.
+---@class oravim
 local query = require("oravim.query")
 local schema = require("oravim.schema")
 local drawer = require("oravim.ui.drawer")
@@ -6,10 +8,12 @@ local runner = require("oravim.runner")
 local completion = require("oravim.completion")
 local storage = require("oravim.storage")
 
+---@type string
 local data_dir = vim.fn.stdpath("data") .. "/oravim"
 
 
 -- defaults oravim settings
+---@type table
 local defaults = {
     cli = "sqlplus",
     sqlcl = "sql",
@@ -26,17 +30,23 @@ local defaults = {
     },
 }
 
+---@type table
 local config = vim.deepcopy(defaults)
+---@type table
 local state = {
     current = nil,
     saved = { expanded = false, list = {} }, --saved queries
 }
 
 local M = {}
+---@type boolean
 local initialized = false
 
 -- wrapper to schedula nvim notification with consistent title.
 -- use vim.schedule so ui chnages happen safely after the async callbacks
+---Schedule a notification with the plugin title.
+---@param msg string
+---@param level? integer
 local function notify(msg, level)
     vim.schedule(function()
         vim.notify(msg, level or vim.log.levels.INFO, { title = "oravim" })
@@ -44,6 +54,8 @@ local function notify(msg, level)
 end
 
 -- checks/creates a directory
+---Ensure a directory exists.
+---@param path string
 local function ensure_dir(path)
     if path == "" then
         return
@@ -53,10 +65,12 @@ local function ensure_dir(path)
     end
 end
 
+---Load saved queries from disk into state.
 local function load_saved_queries()
     state.saved.list = storage.load_saved_queries(config.query.saved_dir)
 end
 -- check/create the neccessary dirs for the plugin
+---Create required data directories and refresh saved queries.
 local function ensure_paths()
     ensure_dir(data_dir)
     ensure_dir(config.query.tmp_dir)
@@ -64,10 +78,17 @@ local function ensure_paths()
     load_saved_queries()
 end
 
+---Trim leading and trailing whitespace.
+---@param str? string
+---@return string
 local function trim(str)
     return (str or ""):gsub("^%s+", ""):gsub("%s+$", "")
 end
 
+---Parse schema owner from a connection string.
+---@param url? string
+---@return string
+---@return string|nil
 local function parse_schema_owner(url)
     local username = (url or ""):match("^(.-)/") or ""
     username = trim(username)
@@ -77,6 +98,9 @@ local function parse_schema_owner(url)
     return username:upper()
 end
 
+---Build a user@db string from a connection string.
+---@param url? string
+---@return string
 local function get_db_string(url)
     local username = trim((url or ""):match("^(.-)/") or "")
     local db_name = trim((url or ""):match("@(.-)$") or "")
@@ -86,6 +110,9 @@ local function get_db_string(url)
     return trim(url or "")
 end
 -- create or update the internal DB entry for a connection definition
+---Create a new internal database entry for a connection definition.
+---@param def { url: string }
+---@return table
 local function upsert_db(def)
     local db = {
         name = get_db_string(def.url),
@@ -103,6 +130,9 @@ end
 
 
 -- resolves & validates a connection definition into an active DB entry
+---Resolve and validate a connection definition, updating current state.
+---@param def { url: string }
+---@param cb fun(db: table|nil, err?: string)
 local function set_current(def, cb)
     if not def or not def.url then
         cb(nil, "missing connection definition")
@@ -157,6 +187,8 @@ end
 -- Initialize the pluging by merging user config
 -- ensure dirs exist
 -- write the UI/query modules with shared state and helpers
+---Configure the plugin and initialize UI integrations.
+---@param opts? table
 function M.setup(opts)
     config = vim.tbl_deep_extend("force", defaults, opts or {})
     ensure_paths()
@@ -203,6 +235,8 @@ function M.setup(opts)
     initialized = true
 end
 
+---Connect to a database using a sqlplus connection string.
+---@param arg string
 function M.connect(arg)
     if not initialized then
         M.setup()
@@ -224,10 +258,13 @@ function M.connect(arg)
     end)
 end
 
+---Execute the current buffer or selection.
+---@param opts? table
 function M.run(opts)
     query.execute(opts or {})
 end
 
+---Open the drawer UI.
 function M.show_ui()
     if not initialized then
         M.setup()
@@ -235,6 +272,7 @@ function M.show_ui()
     drawer.open()
 end
 
+---Toggle the drawer UI.
 function M.toggle_ui()
     if not initialized then
         M.setup()
@@ -242,6 +280,8 @@ function M.toggle_ui()
     drawer.toggle()
 end
 
+---List schemas for the current connection.
+---@param cb fun(list?: string[]|nil, err?: string)
 function M.list_schemas(cb)
     local db = state.current
     if not db then
@@ -255,6 +295,9 @@ function M.list_schemas(cb)
     cb({ db.schema_owner })
 end
 
+---List tables for a schema.
+---@param schema_name string
+---@param cb fun(list?: string[]|nil, err?: string)
 function M.list_tables(schema_name, cb)
     local db = state.current
     if not db then

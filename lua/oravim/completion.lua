@@ -1,10 +1,15 @@
+---Completion provider for SQL buffers.
+---@class oravim.completion
 local M = {
     cache = {},
     buffer_state = {},
 }
 
+---@type table|nil
 local ctx = nil
+---@type table
 local notified = {}
+---@type fun(buf: integer)|nil
 local schedule_completion
 
 local reserved_aliases = {
@@ -17,16 +22,23 @@ local reserved_aliases = {
     FULL = true,
 }
 
+---Set module context shared with other modules.
+---@param new_ctx table
 local function set_ctx(new_ctx)
     ctx = new_ctx
 end
 
+---Ensure the module has been initialized.
 local function ensure_ctx()
     if not ctx then
         error("oravim.completion not initialized")
     end
 end
 
+---Send a notification once
+---@param key string
+---@param msg string
+---@param level? integer
 local function notify_once(key, msg, level)
     if notified[key] then
         return
@@ -41,14 +53,21 @@ local function notify_once(key, msg, level)
     end
 end
 
+---Reset a notification key.
+---@param key string
 local function reset_notify(key)
     notified[key] = nil
 end
 
+---Check whether a character is part of an identifier.
+---@param ch string
+---@return boolean
 local function is_word_char(ch)
     return ch:match("[%w_#$]") ~= nil
 end
 
+---Find the start column for completion.
+---@return integer
 local function find_start()
     local line = vim.api.nvim_get_current_line()
     local col = vim.api.nvim_win_get_cursor(0)[2]
@@ -63,6 +82,9 @@ local function find_start()
     return start
 end
 
+---Build a new cache structure for the schema owner.
+---@param schema_owner string
+---@return table
 local function build_cache(schema_owner)
     return {
         schema_owner = schema_owner,
@@ -83,6 +105,11 @@ local function build_cache(schema_owner)
     }
 end
 
+---Get or create the completion cache for a connection.
+---@param conn table
+---@param schema_owner string
+---@return table|nil
+---@return string|nil
 local function get_cache(conn, schema_owner)
     if not conn then
         return nil, nil
@@ -99,6 +126,8 @@ local function get_cache(conn, schema_owner)
     return cache, key
 end
 
+---Merge tables and views into the relations list.
+---@param cache table
 local function merge_relations(cache)
     if not cache.tables or not cache.views then
         return
@@ -110,6 +139,11 @@ local function merge_relations(cache)
     cache.relations_version = (cache.relations_version or 0) + 1
 end
 
+---Load table list into cache.
+---@param cache table
+---@param conn table
+---@param schema_owner string
+---@param on_update? fun()
 local function load_tables(cache, conn, schema_owner, on_update)
     if cache.tables or cache.loading.tables then
         return
@@ -130,6 +164,11 @@ local function load_tables(cache, conn, schema_owner, on_update)
     end)
 end
 
+---Load view list into cache.
+---@param cache table
+---@param conn table
+---@param schema_owner string
+---@param on_update? fun()
 local function load_views(cache, conn, schema_owner, on_update)
     if cache.views or cache.loading.views then
         return
@@ -150,6 +189,13 @@ local function load_views(cache, conn, schema_owner, on_update)
     end)
 end
 
+---Load package list into cache.
+---@param cache table
+---@param conn table
+---@param schema_owner string
+---@param buf integer
+---@param on_update? fun()
+---@param schedule? boolean
 local function load_packages(cache, conn, schema_owner, buf, on_update, schedule)
     if cache.packages or cache.loading.packages then
         return
@@ -173,6 +219,12 @@ local function load_packages(cache, conn, schema_owner, buf, on_update, schedule
     end)
 end
 
+---Ensure relations list is loaded.
+---@param cache table
+---@param conn table
+---@param schema_owner string
+---@param on_update? fun()
+---@return boolean
 local function ensure_relations(cache, conn, schema_owner, on_update)
     load_tables(cache, conn, schema_owner, on_update)
     load_views(cache, conn, schema_owner, on_update)
@@ -185,6 +237,9 @@ local function ensure_relations(cache, conn, schema_owner, on_update)
     return false
 end
 
+---Build a case-insensitive lookup for a list.
+---@param list string[]|nil
+---@return table
 local function build_lookup(list)
     local lookup = {}
     for _, name in ipairs(list or {}) do
@@ -194,6 +249,8 @@ local function build_lookup(list)
 end
 
 -- only used by omnifunc
+---Trigger omnifunc completion in insert mode.
+---@param buf integer
 schedule_completion = function(buf)
     vim.schedule(function()
         if not vim.api.nvim_buf_is_valid(buf) then
@@ -211,6 +268,15 @@ schedule_completion = function(buf)
     end)
 end
 
+---Ensure columns for a table are loaded.
+---@param cache table
+---@param conn table
+---@param schema_owner string
+---@param table_name string
+---@param buf integer
+---@param on_update? fun()
+---@param schedule? boolean
+---@return string[]|nil
 local function ensure_columns(cache, conn, schema_owner, table_name, buf, on_update, schedule)
     if not table_name or table_name == "" then
         return nil
@@ -242,6 +308,15 @@ local function ensure_columns(cache, conn, schema_owner, table_name, buf, on_upd
     return nil
 end
 
+---Ensure members for a package are loaded.
+---@param cache table
+---@param conn table
+---@param schema_owner string
+---@param package_name string
+---@param buf integer
+---@param on_update? fun()
+---@param schedule? boolean
+---@return string[]|nil
 local function ensure_package_members(cache, conn, schema_owner, package_name, buf, on_update, schedule)
     if not package_name or package_name == "" then
         return nil
@@ -273,6 +348,12 @@ local function ensure_package_members(cache, conn, schema_owner, package_name, b
     return nil
 end
 
+---Add an alias mapping if valid.
+---@param alias_map table
+---@param alias_order string[]
+---@param alias_upper string
+---@param alias_value string
+---@param table_name string
 local function add_alias(alias_map, alias_order, alias_upper, alias_value, table_name)
     if reserved_aliases[alias_upper] then
         return
@@ -285,6 +366,11 @@ local function add_alias(alias_map, alias_order, alias_upper, alias_value, table
 end
 
 -- parse and link the aliases with a tablename
+---Scan a line for table aliases and add them.
+---@param line string
+---@param relation_lookup table
+---@param alias_map table
+---@param alias_order string[]
 local function scan_aliases_in_line(line, relation_lookup, alias_map, alias_order)
     local upper = line:upper()
     local patterns = {
@@ -310,6 +396,14 @@ local function scan_aliases_in_line(line, relation_lookup, alias_map, alias_orde
 end
 
 -- Read the buffer lines one per completion request and parse then in pairs and cache the results
+---Get cached aliases for a buffer or compute them.
+---@param buf integer
+---@param relations string[]
+---@param relation_lookup table
+---@param conn_key string
+---@param relations_version integer
+---@return table
+---@return string[]
 local function get_aliases(buf, relations, relation_lookup, conn_key, relations_version)
     local tick = vim.api.nvim_buf_get_changedtick(buf)
     local state = M.buffer_state[buf]
@@ -340,6 +434,15 @@ local function get_aliases(buf, relations, relation_lookup, conn_key, relations_
     return alias_map, alias_order
 end
 
+---Add completion items from a list.
+---@param dest table[]
+---@param list string[]|nil
+---@param base_upper string
+---@param max_items integer
+---@param kind string
+---@param info string|fun(word: string): string
+---@param menu string
+---@param match_base boolean
 local function add_items(dest, list, base_upper, max_items, kind, info, menu, match_base)
     if not list then
         return
@@ -367,6 +470,15 @@ local function add_items(dest, list, base_upper, max_items, kind, info, menu, ma
     end
 end
 
+---Add alias completion items.
+---@param dest table[]
+---@param alias_map table
+---@param alias_order string[]
+---@param base_upper string
+---@param max_items integer
+---@param menu string
+---@param view_lookup table
+---@param match_base boolean
 local function add_alias_items(dest, alias_map, alias_order, base_upper, max_items, menu, view_lookup, match_base)
     if not alias_map or not alias_order then
         return
@@ -396,10 +508,16 @@ local function add_alias_items(dest, alias_map, alias_order, base_upper, max_ite
     end
 end
 
+---Initialize completion with shared context.
+---@param options table
 function M.setup(options)
     set_ctx(options)
 end
 
+---Collect completion items for the current context.
+---@param opts table
+---@return table[]
+---@return boolean
 function M.collect(opts)
     ensure_ctx()
     opts = opts or {}
@@ -526,10 +644,16 @@ function M.collect(opts)
     return items, false
 end
 
+---Get the configured SQL filetype.
+---@return string
 function M.get_filetype()
     return (ctx and ctx.config and ctx.config.query and ctx.config.query.filetype) or "plsql"
 end
 
+---Vim omnifunc entry point.
+---@param findstart integer
+---@param base string
+---@return integer|table
 function M.omnifunc(findstart, base)
     if findstart == 1 then
         return find_start()
