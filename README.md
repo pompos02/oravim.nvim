@@ -133,7 +133,7 @@ Oravim sets `omnifunc` for the configured `query.filetype`.
 vim.bo.omnifunc = "v:lua.require'oravim.completion'.omnifunc"
 ```
 
-### blink.cmp source (optional)
+### blink.cmp source
 ```lua
 require("blink.cmp").setup({
     sources = {
@@ -142,13 +142,14 @@ require("blink.cmp").setup({
             sql = { "oravim", "buffer"},
             plsql = { "oravim", "buffer"},
 
-        providers = {
-            oravim = {
-                name = "oravim",
-                module = "oravim.blink",
+            providers = {
+                oravim = {
+                    name = "oravim",
+                    module = "oravim.blink",
+                },
             },
         },
-    },
+    }
 })
 ```
 
@@ -171,6 +172,9 @@ require("oravim").setup({
         tmp_dir = "/tmp/oravim",
         saved_dir = vim.fn.stdpath("data") .. "/oravim/saved_queries",
     },
+    results = {
+        pinned_header = true,
+    }
 })
 ```
 ## Data locations

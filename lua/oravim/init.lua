@@ -28,6 +28,9 @@ local defaults = {
         tmp_dir = "/tmp/oravim",
         saved_dir = data_dir .. "/saved_queries"
     },
+    results = {
+        pinned_header = true,
+    }
 }
 
 ---@type table
@@ -216,6 +219,12 @@ function M.setup(opts)
         schema = schema,
         notify = notify,
     }
+
+    local results_ctx = {
+        config = config,
+    }
+
+    results.setup(results_ctx)
     drawer.setup(drawer_ctx)
     query.setup(query_ctx)
     completion.setup(completion_ctx)

@@ -2,6 +2,8 @@
 ---@class oravim.results
 local M = {}
 
+---@type table|nil
+local ctx = nil
 ---@type integer|nil
 local result_buf
 ---@type integer
@@ -26,6 +28,21 @@ local header_autocmds = false
 ---  second_line: string,
 ---  third_line: string }
 local header_state
+
+---get the user defined options
+---@param options table|nil
+local function set_ctx(options)
+    ctx = options
+end
+
+---return if we should use the header or not
+local function header_enabled()
+    return ctx and ctx.config.results.pinned_header
+end
+
+function M.setup(options)
+    set_ctx(options)
+end
 
 ---Split output into lines, returning a fallback when empty.
 ---@param str? string
@@ -404,7 +421,9 @@ local function ensure_buffer()
             clear_header(buf)
         end,
     })
-    ensure_header_autocmds()
+    if header_enabled() then
+        ensure_header_autocmds()
+    end
     return result_buf
 end
 
@@ -429,7 +448,7 @@ local function update_loading(buf, message, token, index)
         height = vim.api.nvim_win_get_height(win)
     end
     set_lines(buf, build_loading_lines(frame, message, width, height))
-    update_header(buf, win)
+    --update_header(buf, win)
     local next_index = index + 1
     if next_index > #loader_frames then
         next_index = 1
@@ -469,9 +488,11 @@ function M.show(res)
 
     local buf = ensure_buffer()
     set_lines(buf, lines)
-
     open_window(buf)
-    update_header(buf)
+    if header_enabled() then
+        update_header(buf)
+    end
+
     return buf
 end
 
