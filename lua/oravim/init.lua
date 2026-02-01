@@ -39,6 +39,7 @@ local config = vim.deepcopy(defaults)
 local state = {
     current = nil,
     saved = { expanded = false, list = {} }, --saved queries
+    active_buffer_path = nil,
 }
 
 local M = {}
@@ -226,6 +227,33 @@ function M.setup(opts)
     drawer.setup(drawer_ctx)
     query.setup(query_ctx)
     completion.setup(completion_ctx)
+    local active_group = vim.api.nvim_create_augroup("oravim_active_buffer", { clear = true })
+    vim.api.nvim_create_autocmd({ "BufEnter", "WinEnter" }, {
+        group = active_group,
+        callback = function()
+            local buf = vim.api.nvim_get_current_buf()
+            if not (buf and vim.api.nvim_buf_is_valid(buf)) then
+                return
+            end
+            local ft = vim.bo[buf].filetype
+            if ft == "oravimui" or ft == "oravimout" then
+                return
+            end
+            local db = state.current
+            local path = vim.api.nvim_buf_get_name(buf)
+            if db and path ~= "" and vim.tbl_contains(db.buffers.list, path) then
+                if state.active_buffer_path ~= path then
+                    state.active_buffer_path = path
+                    drawer.render()
+                end
+                return
+            end
+            if state.active_buffer_path ~= nil then
+                state.active_buffer_path = nil
+                drawer.render()
+            end
+        end,
+    })
     local group = vim.api.nvim_create_augroup("oravim_completion", { clear = true })
     vim.api.nvim_create_autocmd("FileType", {
         group = group,

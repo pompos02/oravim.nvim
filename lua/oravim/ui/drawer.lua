@@ -450,6 +450,18 @@ local function render_db(lines, db)
         text = string.format("%s%s%s", prefix, db.name, status),
         text_group = "Identifier",
     })
+    local drawer_width = valid_win() and vim.api.nvim_win_get_width(win) or (ctx.config.drawer and ctx.config.drawer.width)
+    if drawer_width then
+        local label_width = vim.fn.strdisplaywidth(label)
+        local pad = math.max(math.floor((drawer_width - label_width) / 2), 0)
+        if pad > 0 then
+            label = string.rep(" ", pad) .. label
+            for _, highlight in ipairs(highlights) do
+                highlight.start = highlight.start + pad
+                highlight.finish = highlight.finish + pad
+            end
+        end
+    end
     if status ~= "" then
         table.insert(highlights, { group = "DiagnosticError", start = #label - 1, finish = #label })
     end
@@ -460,14 +472,14 @@ local function render_db(lines, db)
     })
 
     local new_query_label, new_query_highlights = build_line({
-        indent = 1,
+        indent = 0,
         icon = "new_query",
         text = "New query",
     })
     add_entry(lines, new_query_label, { kind = "new_query", db = db, highlights = new_query_highlights })
 
     local saved_queries_label, saved_queries_highlights = build_line({
-        indent = 1,
+        indent = 0,
         toggle = ctx.state.saved.expanded,
         icon = "saved_queries",
         text = string.format("Saved queries (%d)", #ctx.state.saved.list),
@@ -496,7 +508,7 @@ local function render_db(lines, db)
     end
 
     local buffers_label, buffers_highlights = build_line({
-        indent = 1,
+        indent = 0,
         toggle = db.buffers.expanded,
         icon = "buffers",
         text = string.format("Buffers (%d)", #db.buffers.list),
@@ -524,8 +536,12 @@ local function render_db(lines, db)
                 icon = "buffer",
                 text = name,
             })
+            if ctx.state and ctx.state.active_buffer_path == path then
+                local hl_group = "Special"
+                table.insert(buffer_highlights, 1, { group = hl_group, start = 0, finish = #buffer_label })
+            end
             if is_tmp then
-                table.insert(buffer_highlights, { group = "Special", start = text_start + #name - 1, finish = text_start + #name })
+                table.insert(buffer_highlights, { group = "Comment", start = text_start + #name - 1, finish = text_start + #name })
             end
             add_entry(lines, buffer_label, {
                 kind = "buffer",
@@ -541,7 +557,7 @@ local function render_db(lines, db)
     end
     if db.schemas.loading then
         local loading_label, loading_highlights = build_line({
-            indent = 1,
+            indent = 0,
             icon = "info",
             text = "(loading...)",
         })
@@ -549,7 +565,7 @@ local function render_db(lines, db)
     end
     if db.schemas.loaded and #db.schemas.list == 0 then
         local none_label, none_highlights = build_line({
-            indent = 1,
+            indent = 0,
             icon = "info",
             text = "(no schemas)",
         })
@@ -562,7 +578,7 @@ local function render_db(lines, db)
             db.schemas.items[schema_name] = schema_item
         end
         local schema_line, schema_highlights = build_line({
-            indent = 1,
+            indent = 0,
             toggle = schema_item.expanded,
             icon = "schema",
             text = schema_name,
@@ -579,7 +595,7 @@ local function render_db(lines, db)
                 if section then
                     local count = section.loaded and #section.list or 0
                     local section_line, section_highlights = build_line({
-                        indent = 2,
+                        indent = 1,
                         toggle = section.expanded,
                         icon = "section",
                         section = entry.key,
@@ -601,14 +617,14 @@ local function render_db(lines, db)
                     if section.expanded then
                         if section.loading then
                             local loading_label, loading_highlights = build_line({
-                                indent = 4,
+                                indent = 3,
                                 icon = "info",
                                 text = "(loading...)",
                             })
                             add_entry(lines, loading_label, { kind = "info", highlights = loading_highlights })
                         elseif section.error then
                             local error_label, error_highlights = build_line({
-                                indent = 4,
+                                indent = 3,
                                 icon = "error",
                                 text = "(error: " .. section.error .. ")",
                             })
@@ -616,7 +632,7 @@ local function render_db(lines, db)
                         else
                             for _, object_name in ipairs(section.list) do
                                 local object_line, object_highlights = build_line({
-                                    indent = 4,
+                                    indent = 3,
                                     icon = "object",
                                     section = entry.key,
                                     text = object_name,

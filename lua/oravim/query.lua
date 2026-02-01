@@ -238,6 +238,9 @@ local function setup_buffer(db, buf, path, opts)
 
     add_buffer(db, path, tmp)
     ctx.state.current = db
+    if vim.api.nvim_get_current_buf() == buf then
+        ctx.state.active_buffer_path = path
+    end
 
     vim.bo[buf].swapfile = false
     vim.bo[buf].buflisted = true
@@ -255,6 +258,9 @@ local function setup_buffer(db, buf, path, opts)
         buffer = buf,
         callback = function()
             remove_buffer(db, path)
+            if ctx.state and ctx.state.active_buffer_path == path then
+                ctx.state.active_buffer_path = nil
+            end
             if ctx.drawer and ctx.drawer.render then
                 ctx.drawer.render()
             end
