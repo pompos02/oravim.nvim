@@ -19,10 +19,10 @@ local defaults = {
     sqlcl = "sql",
     drawer = { width = 40, position = "left" },
     use_nerd_fonts = true,
-    max_completion_items = 5000,
+    max_completion_items = 500,
     query = {
         filetype = "plsql",
-        default = "SELECT * FROM {optional_schema}{table};",
+        default = "SELECT * FROM {table};",
         new_query = "",
         execute_on_save = false,
         tmp_dir = "/tmp/oravim",
@@ -45,9 +45,8 @@ local M = {}
 ---@type boolean
 local initialized = false
 
--- wrapper to schedula nvim notification with consistent title.
+-- wrapper to schedule nvim notification with consistent title.
 -- use vim.schedule so ui chnages happen safely after the async callbacks
----Schedule a notification with the plugin title.
 ---@param msg string
 ---@param level? integer
 local function notify(msg, level)
@@ -57,7 +56,6 @@ local function notify(msg, level)
 end
 
 -- checks/creates a directory
----Ensure a directory exists.
 ---@param path string
 local function ensure_dir(path)
     if path == "" then
@@ -82,10 +80,10 @@ local function ensure_paths()
 end
 
 ---Trim leading and trailing whitespace.
----@param str? string
+---@param str string
 ---@return string
 local function trim(str)
-    return (str or ""):gsub("^%s+", ""):gsub("%s+$", "")
+    return str:gsub("^%s+", ""):gsub("%s+$", "")
 end
 
 ---Parse schema owner from a connection string.
@@ -105,8 +103,8 @@ end
 ---@param url? string
 ---@return string
 local function get_db_string(url)
-    local username = trim((url or ""):match("^(.-)/") or "")
-    local db_name = trim((url or ""):match("@(.-)$") or "")
+    local username = trim(url:match("^(.-)/") or "")
+    local db_name = trim(url:match("@(.-)$") or "")
     if username ~= "" and db_name ~= "" then
         return username .. "@" .. db_name
     end

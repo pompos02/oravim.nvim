@@ -278,18 +278,11 @@ end
 ---@return string
 local function build_default_content(db, schema_name, table_name)
     if not table_name or table_name == "" then
-        local base = ctx.config.query.new_query or ""
-        base = base:gsub("{dbname}", db.name or "")
-        return base
+        return ""
     end
     local template = ctx.config.query.default
-    local optional_schema = ""
-    if schema_name and schema_name ~= "" then
-        optional_schema = schema_name .. "."
-    end
     template = template:gsub("{table}", table_name or "")
     template = template:gsub("{schema}", schema_name or "")
-    template = template:gsub("{optional_schema}", optional_schema)
     template = template:gsub("{dbname}", db.name or "")
     return template
 end

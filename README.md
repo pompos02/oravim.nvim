@@ -166,7 +166,7 @@ require("oravim").setup({
     max_completion_items = 5000,
     query = {
         filetype = "plsql",
-        default = "SELECT * FROM {optional_schema}{table};",
+        default = "SELECT * FROM {table};",
         new_query = "",
         execute_on_save = false,
         tmp_dir = "/tmp/oravim",
