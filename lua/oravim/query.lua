@@ -456,8 +456,8 @@ function M.execute(opts)
             return
         end
 
-        ctx.results.loading("Executing query...")
         ensure_normal_mode()
+        ctx.results.loading("Executing query...")
         local start = vim.uv.hrtime()
         runner.run(conn, sql, function(ok, out, err_out)
             local duration = (vim.uv.hrtime() - start) / 1e9
