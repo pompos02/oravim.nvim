@@ -26,6 +26,7 @@ local defaults = {
         new_query = "",
         execute_on_save = false,
         tmp_dir = "/tmp/oravim",
+        tmp_saved_dir = "/tmp/oravim/saved",
         saved_dir = data_dir .. "/saved_queries"
     },
     results = {
@@ -221,6 +222,7 @@ function M.setup(opts)
 
     local results_ctx = {
         config = config,
+        notify = notify,
     }
 
     results.setup(results_ctx)
@@ -297,6 +299,14 @@ end
 ---@param opts? table
 function M.run(opts)
     query.execute(opts or {})
+end
+
+---Save the current results buffer to a temp file and open it.
+function M.save_results()
+    if not initialized then
+        M.setup()
+    end
+    results.save_to_temp()
 end
 
 ---Open the drawer UI.

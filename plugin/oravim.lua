@@ -33,3 +33,7 @@ end, { desc = "Toggle Oravim drawer" })
 vim.api.nvim_create_user_command("OraSave", function()
     query.save_query()
 end, { nargs = 0, desc = "Save the current buffer" })
+
+vim.api.nvim_create_user_command("OraResultsSave", function()
+    oravim.save_results()
+end, { nargs = 0, desc = "Save results to a temp file" })

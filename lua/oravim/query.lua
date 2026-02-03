@@ -16,7 +16,8 @@ end
 ---Ensure the user is in normal mode
 local function ensure_normal_mode()
     if vim.fn.mode() ~= "n" then
-        vim.cmd("normal! <Esc>")
+        local esc = vim.api.nvim_replace_termcodes("<Esc>", true, false, true)
+        vim.api.nvim_feedkeys(esc, "nx", false)
     end
 end
 
@@ -444,19 +445,30 @@ end
 function M.execute(opts)
     ensure_ctx()
     local buf = opts.buf or vim.api.nvim_get_current_buf()
+    local visual_sql
+    if opts.selection then
+        visual_sql = get_visual_selection(buf)
+        ensure_normal_mode()
+    end
     ensure_current(function(conn, err)
         if not conn then
             ctx.notify(err or "Unable to connect", vim.log.levels.ERROR)
             return
         end
 
-        local sql, err_sql = M.extract({ buf = buf, selection = opts.selection })
+        local sql, err_sql
+        if opts.selection then
+            sql = visual_sql
+            if not sql or vim.trim(sql) == "" then
+                err_sql = "No SQL found"
+            end
+        else
+            sql, err_sql = M.extract({ buf = buf, selection = false })
+        end
         if not sql then
             ctx.notify(err_sql or "No SQL to run", vim.log.levels.ERROR)
             return
         end
-
-        ensure_normal_mode()
         ctx.results.loading("Executing query...")
         local start = vim.uv.hrtime()
         runner.run(conn, sql, function(ok, out, err_out)

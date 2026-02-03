@@ -35,6 +35,28 @@ local function set_ctx(options)
     ctx = options
 end
 
+---Send a notification using the configured notifier.
+---@param msg string
+---@param level? integer
+local function notify(msg, level)
+    if ctx and ctx.notify then
+        ctx.notify(msg, level)
+        return
+    end
+    vim.notify(msg, level or vim.log.levels.INFO, { title = "oravim" })
+end
+
+---Ensure a directory exists.
+---@param path string
+local function ensure_dir(path)
+    if path == "" then
+        return
+    end
+    if vim.fn.isdirectory(path) == 0 then
+        vim.fn.mkdir(path, "p")
+    end
+end
+
 ---return if we should use the header or not
 local function header_enabled()
     return ctx and ctx.config.results.pinned_header
@@ -427,6 +449,15 @@ local function ensure_buffer()
     return result_buf
 end
 
+---Get the current results buffer if it exists.
+---@return integer|nil
+function M.get_buffer()
+    if result_buf and vim.api.nvim_buf_is_valid(result_buf) then
+        return result_buf
+    end
+    return nil
+end
+
 ---Advance the loader animation if the token matches.
 ---@param buf integer
 ---@param message? string
@@ -494,6 +525,41 @@ function M.show(res)
     end
 
     return buf
+end
+
+---Save the current results buffer to a temp file and open it in a new tab.
+---@return string|nil
+function M.save_to_temp()
+    local buf = M.get_buffer()
+    if not buf then
+        notify("No results buffer to save", vim.log.levels.WARN)
+        return nil
+    end
+
+    local default_dir = ctx.config.query.tmp_saved_dir
+    local path = vim.fn.input("Temporarily save as: ", default_dir .. "/", "file")
+    if not path or path == "" then
+        notify("Save cancelled", vim.log.levels.INFO)
+        return nil
+    end
+
+    local lines = vim.api.nvim_buf_get_lines(buf, 0, -1, false)
+    ensure_dir(vim.fn.fnamemodify(path, ":p:h"))
+    local ok, err = vim.fn.writefile(lines, path, "b")
+    if ok ~= 0 then
+        notify("Failed to save results: " .. (err or "unknown error"), vim.log.levels.ERROR)
+        return nil
+    end
+
+    vim.cmd("tabnew " .. vim.fn.fnameescape(path))
+    vim.bo.filetype = "oravimout"
+
+    if vim.api.nvim_buf_is_valid(buf) then
+        vim.api.nvim_buf_delete(buf, { force = true })
+    end
+
+    notify("Results saved to " .. path)
+    return path
 end
 
 return M
