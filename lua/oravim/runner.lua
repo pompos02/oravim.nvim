@@ -288,30 +288,34 @@ end
 ---@param path string
 ---@param cb fun(ok: boolean, out: string, err: string)
 local function format_pretty_file(path, cb)
-    local lines = read_file(path)
-    if not lines or #lines == 0 then
-        cb(false, "", "")
-        return
-    end
+    local raw = ""
+    local ok, pretty_ok, pretty_out, pretty_err = pcall(function()
+        local lines = read_file(path)
+        if not lines or #lines == 0 then
+            return false, "", "pretty output spool file is empty"
+        end
 
-    local raw = table.concat(lines, "\n")
+        raw = table.concat(lines, "\n")
 
-    local trimmed = vim.trim(raw)
-    if trimmed == "" then
-        cb(false, raw, "")
-        return
-    end
-    local ok, decoded = pcall(vim.fn.json_decode, trimmed)
+        local trimmed = vim.trim(raw)
+        if trimmed == "" then
+            return false, raw, "pretty output spool file contains only whitespace"
+        end
+        local decode_ok, decoded = pcall(vim.fn.json_decode, trimmed)
+        if not decode_ok then
+            return false, raw, "failed to decode SQLcl JSON: " .. tostring(decoded)
+        end
+        local rows = build_rows_from_json(decoded)
+        if not rows or #rows == 0 then
+            return false, raw, "SQLcl JSON did not contain supported results[1].columns/items shape"
+        end
+        return true, render_table(rows), ""
+    end)
     if not ok then
-        cb(false, raw, "")
+        cb(false, raw, "pretty formatter crashed: " .. tostring(pretty_ok))
         return
     end
-    local rows = build_rows_from_json(decoded)
-    if not rows or #rows == 0 then
-        cb(false, raw, "")
-        return
-    end
-    cb(true, render_table(rows), "")
+    cb(pretty_ok, pretty_out, pretty_err)
 end
 
 ---Execute SQL via sqlplus/sqlcl and return stdout/stderr.
@@ -353,11 +357,14 @@ local function run_sqlplus(conn, sql, cb, opts)
                     cb(ok, out, err_out)
                     return
                 end
-                format_pretty_file(opts.spool_path, function(pretty_ok, pretty_out, _)
+                format_pretty_file(opts.spool_path, function(pretty_ok, pretty_out, pretty_err)
                     vim.fn.delete(opts.spool_path)
                     if pretty_ok and pretty_out ~= "" then
                         cb(ok, pretty_out, err_out)
                     else
+                        if pretty_err and pretty_err ~= "" then
+                            vim.notify(pretty_err, vim.log.levels.WARN, { title = "oravim pretty print" })
+                        end
                         cb(ok, pretty_out ~= "" and pretty_out or out, err_out)
                     end
                 end)
