@@ -31,6 +31,7 @@ local defaults = {
     },
     results = {
         pinned_header = true,
+        focus_on_execute = false,
     }
 }
 

@@ -407,13 +407,19 @@ end
 ---Open or focus the results window for a buffer.
 ---@param buf integer
 local function open_window(buf)
+    local current_win = vim.api.nvim_get_current_win()
     local win = find_result_window(buf)
     if win then
-        vim.api.nvim_set_current_win(win)
+        if ctx.config.results.focus_on_execute then
+            vim.api.nvim_set_current_win(win)
+        end
     else
         vim.cmd("botright split")
         vim.api.nvim_win_set_buf(0, buf)
         win = vim.api.nvim_get_current_win()
+        if not ctx.config.results.focus_on_execute then
+            vim.api.nvim_set_current_win(current_win)
+        end
     end
     vim.wo[win].relativenumber = false
     vim.wo[win].number = false

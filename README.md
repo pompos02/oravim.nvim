@@ -174,6 +174,7 @@ require("oravim").setup({
     },
     results = {
         pinned_header = true,
+        focus_on_execute = false,
     }
 })
 ```
